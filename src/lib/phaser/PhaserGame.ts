@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import GameScene from './GameScene';
 
 export default class PhaserGame {
   private game: Phaser.Game | null = null;
@@ -19,7 +20,7 @@ export default class PhaserGame {
             debug: false
           }
         },
-        scene: [BootScene, MainMenuScene, GameScene]
+        scene: [GameScene]
       };
 
       // Create the game instance

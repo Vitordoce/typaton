@@ -37,10 +37,10 @@ export default function Game() {
       <div 
         id="game-container" 
         ref={gameContainerRef}
-        className="border-4 border-indigo-500 rounded-lg overflow-hidden"
+        className="border-4 border-indigo-500 rounded-lg overflow-hidden w-[800px] h-[600px]"
       />
       <div className="mt-6 text-white text-center">
-        <p className="mb-2">Type the words as they appear to score points!</p>
+        <p className="mb-2">Type the falling words before they reach the bottom!</p>
         <p>Press <span className="bg-gray-700 px-2 py-1 rounded">Enter</span> to submit your answer.</p>
       </div>
     </div>
