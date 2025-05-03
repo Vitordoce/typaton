@@ -24,3 +24,9 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.pixel-font {
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 1px;
+  font-weight: bold;
+}

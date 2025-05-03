@@ -6,16 +6,17 @@ export class FallingWord {
   private word: string;
   private velocity: number;
   private isActive: boolean = true;
+  private isHighlighted: boolean = false;
   
   constructor(scene: Phaser.Scene, word: string, x: number, velocity: number) {
     this.scene = scene;
     this.word = word;
     this.velocity = velocity;
     
-    // Create text object
+    // Create text object with 8-bit style
     this.text = scene.add.text(x, 0, word, {
-      fontFamily: 'Arial',
-      fontSize: '24px',
+      fontFamily: 'PressStart2P',
+      fontSize: '16px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2
@@ -46,19 +47,25 @@ export class FallingWord {
   }
   
   highlight(): void {
+    if (this.isHighlighted) return;
+    
+    this.isHighlighted = true;
     this.text.setStyle({
-      fontFamily: 'Arial',
-      fontSize: '24px',
+      fontFamily: 'PressStart2P',
+      fontSize: '16px',
       color: '#ffff00',
       stroke: '#000000',
-      strokeThickness: 2
+      strokeThickness: 3
     });
   }
   
   unhighlight(): void {
+    if (!this.isHighlighted) return;
+    
+    this.isHighlighted = false;
     this.text.setStyle({
-      fontFamily: 'Arial',
-      fontSize: '24px',
+      fontFamily: 'PressStart2P',
+      fontSize: '16px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2
