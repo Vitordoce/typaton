@@ -1,10 +1,35 @@
 import * as Phaser from 'phaser';
 import { WordManager } from './WordManager';
 
+// Define a proper type for word objects 
+interface WordObject {
+  text: Phaser.GameObjects.Text;
+  value: string;
+  vx: number;
+  vy: number;
+  duration: number;
+  startTime: number;
+  startX: number;
+  startY: number;
+  baseX: number;
+  baseY: number;
+  // Bad condition properties
+  blinking: boolean;
+  blinkTimer: number;
+  shaking: boolean;
+  flipped: boolean;
+  flipAngle: number;
+  shakeOffset: { x: number, y: number };
+  shakeRot: number;
+  // Extensible: Add new bad condition properties here
+  // Example: spinning?: boolean;
+  // Example: colorShifting?: boolean;
+}
+
 export default class GameScene extends Phaser.Scene {
   private inputText: string = '';
   private inputDisplay: Phaser.GameObjects.Text | null = null;
-  private words: { text: Phaser.GameObjects.Text, value: string, vx: number, vy: number, duration: number, startTime: number, startX: number, startY: number }[] = [];
+  private words: WordObject[] = [];
   private gameOver: boolean = false;
   private gameOverText: Phaser.GameObjects.Text | null = null;
   private level: number = 1;
@@ -26,6 +51,7 @@ export default class GameScene extends Phaser.Scene {
   private lastSpawnTime: number = 0;
   private score: number = 0;
   private scoreText: Phaser.GameObjects.Text | null = null;
+  private isLevelTransitioning: boolean = false;
 
   // Level settings
   private getLevelSettings() {
@@ -101,7 +127,7 @@ export default class GameScene extends Phaser.Scene {
       color: '#00ff00',
       align: 'center',
       backgroundColor: '#222222',
-      padding: { x: 20, y: 10 },
+      padding: { x: 10, y: 5 },
       lineSpacing: 20
     }).setOrigin(0.5).setVisible(false);
 
@@ -120,65 +146,234 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Check if the game is actively playing (not in game over, completion, or transition states)
+   * This method provides a single place to check if gameplay mechanics should be active
+   */
+  private isActivePlaying(): boolean {
+    return !this.gameOver && !this.campaignComplete && !this.isLevelTransitioning;
+  }
+
   update(time: number, delta: number) {
     if (this.gameOver || this.campaignComplete) return;
+    
     const { width, height } = this.scale;
     const centerX = width / 2;
-    const centerY = height - 40; // bottom center, above input
+    const centerY = height - 40;
     const now = this.time.now;
 
-    // Only 3 words on screen at a time
-    if (this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
+    // Only spawn new words during active gameplay
+    if (this.isActivePlaying() && this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(now, centerX, centerY);
       this.lastSpawnTime = now;
     }
 
-    // Move words toward the center
     for (let i = this.words.length - 1; i >= 0; i--) {
       const wordObj = this.words[i];
-      wordObj.text.x += wordObj.vx * (delta / 1000);
-      wordObj.text.y += wordObj.vy * (delta / 1000);
-      // If the word is close enough to the center, trigger game over
-      const dx = wordObj.text.x - centerX;
-      const dy = wordObj.text.y - centerY;
-      if (Math.sqrt(dx*dx + dy*dy) < 30) {
-        this.gameOver = true;
-        if (this.gameOverText) {
-          this.gameOverText.setVisible(true);
+      
+      // Only update positions during active gameplay
+      if (this.isActivePlaying()) {
+        // Update base position with velocity
+        wordObj.baseX = wordObj.baseX + wordObj.vx * (delta / 1000);
+        wordObj.baseY = wordObj.baseY + wordObj.vy * (delta / 1000);
+      }
+      
+      // Apply bad condition effects (these are always active)
+      this.applyBadConditionEffects(wordObj, delta);
+
+      // Check for game over only during active gameplay
+      if (this.isActivePlaying()) {
+        const dx = wordObj.text.x - centerX;
+        const dy = wordObj.text.y - centerY;
+        if (Math.sqrt(dx*dx + dy*dy) < 30) {
+          this.gameOver = true;
+          if (this.gameOverText) {
+            this.gameOverText.setVisible(true);
+          }
+          break;
         }
-        break;
       }
     }
+  }
+
+  /**
+   * Apply the effects of bad conditions to a word
+   * 
+   * @param wordObj - The word object to apply effects to
+   * @param delta - Time since last frame in milliseconds
+   * 
+   * HOW THE BAD CONDITIONS SYSTEM WORKS:
+   * --------------------------------------------------
+   * 1. Each word can have one or more "bad conditions" assigned to it
+   *    when spawned (in setupBadConditions)
+   * 
+   * 2. Each bad condition has:
+   *    - A property in the WordObject interface (e.g., blinking: boolean)
+   *    - Logic to apply the effect in update (in this method)
+   *    - Often a dedicated method to handle its specific logic
+   * 
+   * 3. To add a new bad condition:
+   *    a. Add its properties to the WordObject interface
+   *    b. Add initialization logic in setupBadConditions()
+   *    c. Add application logic in this method or a dedicated method
+   *    d. Update applyBadConditionEffects to call your logic
+   */
+  private applyBadConditionEffects(wordObj: WordObject, delta: number) {
+    // Apply blinking effect
+    if (wordObj.blinking) {
+      this.applyBlinkingEffect(wordObj, delta);
+    }
+    
+    // Apply shaking effect
+    if (wordObj.shaking) {
+      this.applyShakingEffect(wordObj);
+    } else {
+      // Not shaking, just use base position
+      wordObj.text.x = wordObj.baseX;
+      wordObj.text.y = wordObj.baseY;
+      wordObj.text.rotation = wordObj.flipped ? wordObj.flipAngle : 0;
+    }
+
+    // EXTENSIBILITY POINT: Add more condition checks here
+    // Example:
+    // if (wordObj.spinning) {
+    //   this.applySpinningEffect(wordObj, delta);
+    // }
+  }
+
+  /**
+   * Apply blinking effect to a word
+   * 
+   * @param wordObj - The word to apply the effect to
+   * @param delta - Time since last frame in milliseconds
+   * 
+   * Effect: Word toggles visibility on/off at regular intervals
+   * 
+   * Implementation:
+   * - Uses a timer (blinkTimer) to track when to toggle visibility
+   * - Resets timer when it reaches the blink interval (250ms)
+   * - Word is completely invisible during "off" phases
+   */
+  private applyBlinkingEffect(wordObj: WordObject, delta: number) {
+    wordObj.blinkTimer = (wordObj.blinkTimer || 0) + delta;
+    if (wordObj.blinkTimer > 250) { // toggle every 250ms
+      wordObj.text.visible = !wordObj.text.visible;
+      wordObj.blinkTimer = 0;
+    }
+  }
+
+  /**
+   * Apply shaking effect to a word
+   * 
+   * @param wordObj - The word to apply the effect to
+   * 
+   * Effect: Word vibrates/shakes with random offsets each frame
+  **/
+  private applyShakingEffect(wordObj: WordObject) {
+    // Randomize shake offsets each frame
+    const shakeX = Phaser.Math.Between(-12, 12);
+    const shakeY = Phaser.Math.Between(-4, 4);
+    const shakeRot = Phaser.Math.FloatBetween(-0.05, 0.05);
+    
+    // Store the offsets (might be useful for other effects or adjustments)
+    wordObj.shakeOffset = { x: shakeX, y: shakeY };
+    wordObj.shakeRot = shakeRot;
+    
+    // Apply the shake offsets to the actual text object
+    wordObj.text.x = wordObj.baseX + shakeX;
+    wordObj.text.y = wordObj.baseY + shakeY;
+    wordObj.text.rotation = (wordObj.flipped ? wordObj.flipAngle : 0) + shakeRot;
   }
 
   spawnWord(now: number, centerX: number, centerY: number) {
     const { width, height } = this.scale;
     const { minDuration, maxDuration } = this.getLevelSettings();
-    // Pick a random angle in a 120-degree arc above the player (120° to 240°)
     const angleDeg = Phaser.Math.Between(30, 150);
     const angleRad = Phaser.Math.DegToRad(angleDeg);
-    // Use diagonal for spawn radius, so words start well off-screen
     const diagonal = Math.sqrt(width * width + height * height);
     const spawnRadius = diagonal * 0.8;
     let spawnX = centerX + Math.cos(angleRad) * spawnRadius;
     let spawnY = centerY - Math.sin(angleRad) * spawnRadius;
-    // Clamp to a bit outside the screen, but not too far
     spawnX = Phaser.Math.Clamp(spawnX, -200, width + 200);
     spawnY = Phaser.Math.Clamp(spawnY, -200, height + 200);
-    // Assign a random duration (how long to reach the center)
     const duration = Phaser.Math.FloatBetween(minDuration, maxDuration);
-    // Calculate velocity vector
     const dx = centerX - spawnX;
     const dy = centerY - spawnY;
     const vx = dx / duration;
     const vy = dy / duration;
-    // Use WordManager for word selection
     const wordValue = this.wordManager.getRandomWord();
-    // Create text with arcade font (bigger, more legible)
     const wordText = this.add.text(spawnX, spawnY, wordValue, {
       ...this.arcadeFontStyle
     }).setOrigin(0.5);
-    this.words.push({ text: wordText, value: wordValue, vx, vy, duration, startTime: now, startX: spawnX, startY: spawnY });
+
+    // Create word object with base properties
+    const wordObj = {
+      text: wordText,
+      value: wordValue,
+      vx,
+      vy,
+      duration,
+      startTime: now,
+      startX: spawnX,
+      startY: spawnY,
+      baseX: spawnX,
+      baseY: spawnY,
+      blinking: false,
+      blinkTimer: 0,
+      shaking: false,
+      flipped: false,
+      flipAngle: 0,
+      shakeOffset: { x: 0, y: 0 },
+      shakeRot: 0
+    };
+
+    // Apply bad conditions based on level
+    this.setupBadConditions(wordObj);
+
+    // Add to words array
+    this.words.push(wordObj);
+  }
+
+  /**
+   * Set up bad conditions for a word based on current level
+   * 
+   * @param wordObj - The word object to apply conditions to
+   * 
+   * This is where conditions are assigned to words when they spawn.
+   * The probability of each condition can be adjusted here.
+   * 
+   * Current conditions:
+   * - Blinking: Word toggles visibility (any level, 20% chance)
+   * - Shaking: Word jiggles/vibrates (level 2+, 30% chance)
+   * - Flipped: Word is upside down (level 3+, 30% chance)
+   * 
+   * ADDING A NEW BAD CONDITION:
+   * --------------------------------------------------
+   * 1. Add the condition property to the WordObject interface
+   * 2. Initialize it here based on desired probability and level
+   * 3. Apply any immediate effects (like the flip rotation/tint)
+   * 4. Implement the required update logic in applyBadConditionEffects
+   *    or a dedicated method
+   * 
+   */
+  private setupBadConditions(wordObj: WordObject) {
+    // Blinking: 20% chance, any level
+    wordObj.blinking = Phaser.Math.FloatBetween(0, 1) < 0.2;
+    
+    // Shaking: 30% chance, only level > 1
+    wordObj.shaking = this.level > 1 && Phaser.Math.FloatBetween(0, 1) < 0.3;
+    
+    // Flipped: 30% chance, only level > 1
+    wordObj.flipped = this.level > 2 && Phaser.Math.FloatBetween(0, 1) < 0.3;
+    
+    // Apply flipping effect
+    if (wordObj.flipped) {
+      wordObj.flipAngle = Math.PI; // 180 degrees
+      wordObj.text.rotation = wordObj.flipAngle;
+      wordObj.text.setTint(0xffe600);
+    }
+
+    // EXTENSIBILITY POINT: Add more bad conditions here
   }
 
   handleKeyPress = (event: KeyboardEvent) => {
@@ -231,13 +426,22 @@ export default class GameScene extends Phaser.Scene {
 
   levelComplete() {
     if (this.levelCompleteText) {
+      // Set transitioning state
+      this.isLevelTransitioning = true;
+      
       if (this.level < this.maxLevel) {
         this.levelCompleteText.setText(`LEVEL ${this.level} COMPLETE!\nCLICK TO CONTINUE`);
       } else {
         this.levelCompleteText.setText('CAMPAIGN COMPLETE!\nCLICK TO RESTART');
         this.campaignComplete = true;
       }
+      
       this.levelCompleteText.setVisible(true);
+      
+      // Freeze existing words
+      for (const wordObj of this.words) {
+        wordObj.text.setAlpha(0.5); // Make words semi-transparent to indicate frozen state
+      }
     }
   }
 
@@ -245,6 +449,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.levelCompleteText) {
       this.levelCompleteText.setVisible(false);
     }
+    
     if (this.level < this.maxLevel) {
       this.level++;
       this.wordsCleared = 0;
@@ -252,11 +457,16 @@ export default class GameScene extends Phaser.Scene {
       if (this.levelText) {
         this.levelText.setText(`LEVEL: ${this.level} / ${this.maxLevel}`);
       }
+      
       // Remove all words from screen
       for (const word of this.words) {
         word.text.destroy();
       }
       this.words = [];
+      
+      // Reset transition state
+      this.isLevelTransitioning = false;
+      
       // Increase WordManager difficulty
       this.wordManager.increaseLevel();
     } else {
