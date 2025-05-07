@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { WordManager } from './WordManager';
+import { PowerUpManager, PowerUpType } from './PowerUpManager';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -21,6 +22,9 @@ interface WordObject {
   flipAngle: number;
   shakeOffset: { x: number, y: number };
   shakeRot: number;
+  // Power-up properties
+  isPowerUp?: boolean;
+  powerUpType?: PowerUpType;
   // Extensible: Add new bad condition properties here
   // Example: spinning?: boolean;
   // Example: colorShifting?: boolean;
@@ -40,6 +44,7 @@ export default class GameScene extends Phaser.Scene {
   private levelCompleteText: Phaser.GameObjects.Text | null = null;
   private campaignComplete: boolean = false;
   private wordManager: WordManager;
+  private powerUpManager: PowerUpManager;
   private arcadeFontStyle = {
     fontFamily: '"Press Start 2P", cursive',
     fontSize: '24px', // larger for falling words
@@ -52,6 +57,9 @@ export default class GameScene extends Phaser.Scene {
   private score: number = 0;
   private scoreText: Phaser.GameObjects.Text | null = null;
   private isLevelTransitioning: boolean = false;
+  
+  // Method to trigger bomb effect (added in create)
+  public triggerBombEffect: () => void;
 
   // Level settings
   private getLevelSettings() {
@@ -64,10 +72,26 @@ export default class GameScene extends Phaser.Scene {
 
   constructor() {
     super('GameScene');
-    this.wordManager = new WordManager();
+    console.log('GameScene constructor - this:', this);
+    console.log('GameScene constructor - this.events:', this.events);
+    
+    // Initialize managers after the scene is fully initialized
+    this.triggerBombEffect = () => {}; // Default empty implementation
+  }
+  
+  init() {
+    console.log('GameScene init - this:', this);
+    console.log('GameScene init - this.events:', this.events);
   }
 
   create() {
+    console.log('GameScene create - this:', this);
+    console.log('GameScene create - this.events:', this.events);
+    
+    // Initialize managers here instead of in constructor
+    this.wordManager = new WordManager(this);
+    this.powerUpManager = new PowerUpManager(this);
+    
     const { width, height } = this.scale;
     this.level = 1;
     this.campaignComplete = false;
@@ -81,6 +105,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Reset WordManager
     this.wordManager.resetLevel();
+    
+    // Initialize PowerUpManager
+    this.powerUpManager.setupPowerUpIndicators();
 
     // Add a background
     this.add.rectangle(width/2, height/2, width, height, 0x222222);
@@ -144,6 +171,47 @@ export default class GameScene extends Phaser.Scene {
         this.scene.restart();
       }
     });
+    
+    // Add method to trigger bomb effect
+    this.triggerBombEffect = () => {
+      // Create explosion effect
+      const centerX = width / 2;
+      const centerY = height / 2;
+      
+      // Create particle effect if we have the particle texture
+      if (this.textures.exists('particle')) {
+        const particles = this.add.particles(0, 0, 'particle', {
+          x: centerX,
+          y: centerY,
+          speed: { min: 100, max: 200 },
+          scale: { start: 0.5, end: 0 },
+          lifespan: 800,
+          blendMode: 'ADD',
+          tint: 0xff0000,
+          quantity: 20,
+          emitting: false
+        });
+        
+        // Emit particles once
+        particles.explode(50, centerX, centerY);
+        
+        // Clean up particles after animation
+        this.time.delayedCall(1000, () => {
+          particles.destroy();
+        });
+      }
+      
+      // Destroy all words
+      for (const word of this.words) {
+        word.text.destroy();
+      }
+      this.words = [];
+    };
+    
+    // Make sure power-up display is on top
+    this.time.delayedCall(500, () => {
+      this.bringPowerUpsToFront();
+    });
   }
 
   /**
@@ -162,6 +230,9 @@ export default class GameScene extends Phaser.Scene {
     const centerY = height - 40;
     const now = this.time.now;
 
+    // Update power-up manager
+    this.powerUpManager.update(time, delta);
+    
     // Only spawn new words during active gameplay
     if (this.isActivePlaying() && this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(now, centerX, centerY);
@@ -186,13 +257,28 @@ export default class GameScene extends Phaser.Scene {
         const dx = wordObj.text.x - centerX;
         const dy = wordObj.text.y - centerY;
         if (Math.sqrt(dx*dx + dy*dy) < 30) {
-          this.gameOver = true;
-          if (this.gameOverText) {
-            this.gameOverText.setVisible(true);
+          // Check if shield is active
+          if (this.powerUpManager.hasActiveShield()) {
+            // Use shield instead of game over
+            this.powerUpManager.useShield();
+            
+            // Remove the word
+            wordObj.text.destroy();
+            this.words.splice(i, 1);
+          } else {
+            this.gameOver = true;
+            if (this.gameOverText) {
+              this.gameOverText.setVisible(true);
+            }
           }
           break;
         }
       }
+    }
+    
+    // Periodically ensure power-up displays are on top
+    if (time % 5000 < 100) { // Every ~5 seconds
+      this.bringPowerUpsToFront();
     }
   }
 
@@ -301,10 +387,31 @@ export default class GameScene extends Phaser.Scene {
     const dy = centerY - spawnY;
     const vx = dx / duration;
     const vy = dy / duration;
-    const wordValue = this.wordManager.getRandomWord();
+    
+    // Determine if this should be a power-up word
+    let wordValue;
+    let isPowerUp = false;
+    let powerUpType = null;
+    
+    // 5% chance for any word to be a power-up
+    if (Math.random() < 0.05) {
+      isPowerUp = true;
+      powerUpType = this.powerUpManager.getRandomPowerUpType();
+      
+      // Use a random word from the word pool, not necessarily the power-up name
+      wordValue = this.wordManager.getRandomWord();
+    } else {
+      wordValue = this.wordManager.getRandomWord();
+    }
+    
     const wordText = this.add.text(spawnX, spawnY, wordValue, {
       ...this.arcadeFontStyle
     }).setOrigin(0.5);
+    
+    // Apply power-up effect if needed
+    if (isPowerUp && powerUpType) {
+      this.powerUpManager.applyPowerUpEffect(wordText, powerUpType);
+    }
 
     // Create word object with base properties
     const wordObj = {
@@ -324,11 +431,15 @@ export default class GameScene extends Phaser.Scene {
       flipped: false,
       flipAngle: 0,
       shakeOffset: { x: 0, y: 0 },
-      shakeRot: 0
+      shakeRot: 0,
+      isPowerUp: isPowerUp,
+      powerUpType: powerUpType
     };
 
-    // Apply bad conditions based on level
-    this.setupBadConditions(wordObj);
+    // Apply bad conditions based on level (only for non-power-up words)
+    if (!isPowerUp) {
+      this.setupBadConditions(wordObj);
+    }
 
     // Add to words array
     this.words.push(wordObj);
@@ -395,27 +506,56 @@ export default class GameScene extends Phaser.Scene {
   }
 
   checkWordMatch() {
-    // Remove spaces from input for matching
-    const normalizedInput = this.inputText.replace(/\s+/g, '');
+    // First check if input matches a power-up name and we have that power-up
+    const normalizedInput = this.inputText.toLowerCase();
+    
+    // Check if input matches a power-up type
+    const powerUpType = this.getPowerUpTypeFromText(normalizedInput);
+    if (powerUpType && this.powerUpManager.getCollectedCount(powerUpType) > 0) {
+      // Activate the power-up
+      this.powerUpManager.activatePowerUp(powerUpType);
+      
+      // Clear input
+      this.inputText = '';
+      if (this.inputDisplay) {
+        this.inputDisplay.setText('');
+      }
+      return;
+    }
+    
+    // If not a power-up activation, check for matching words
     for (let i = 0; i < this.words.length; i++) {
       // Remove spaces from word value for matching
       const normalizedWord = this.words[i].value.replace(/\s+/g, '');
       if (normalizedInput === normalizedWord) {
+        // Check if it's a power-up word
+        const isPowerUp = this.words[i].isPowerUp;
+        const powerUpType = this.words[i].powerUpType;
+        
         // Remove the word
         this.words[i].text.destroy();
         this.words.splice(i, 1);
+        
         // Clear input
         this.inputText = '';
         if (this.inputDisplay) {
           this.inputDisplay.setText('');
         }
+        
+        // If it's a power-up word, collect it instead of activating
+        if (isPowerUp && powerUpType) {
+          this.powerUpManager.collectPowerUp(powerUpType);
+        }
+        
         // Track cleared words
         this.wordsCleared++;
+        
         // Increment score
         this.score++;
         if (this.scoreText) {
           this.scoreText.setText(`SCORE: ${this.score}`);
         }
+        
         if (this.wordsCleared >= this.getLevelSettings().wordsToClear) {
           this.levelComplete();
         }
@@ -469,8 +609,32 @@ export default class GameScene extends Phaser.Scene {
       
       // Increase WordManager difficulty
       this.wordManager.increaseLevel();
+      
+      // Power-ups are automatically preserved since they're stored in PowerUpManager
     } else {
       // Campaign complete, handled in levelComplete
+    }
+  }
+  
+  /**
+   * Get the power-up type from text
+   * @param text - The text to check
+   * @returns PowerUpType | null - The matching power-up type or null if no match
+   */
+  getPowerUpTypeFromText(text: string): PowerUpType | null {
+    const lowerText = text.toLowerCase();
+    for (const type of Object.values(PowerUpType)) {
+      if (lowerText === type.toLowerCase()) {
+        return type;
+      }
+    }
+    return null;
+  }
+  
+  // Call this at the end of create() method
+  bringPowerUpsToFront(): void {
+    if (this.powerUpManager) {
+      this.powerUpManager.bringToFront();
     }
   }
 }

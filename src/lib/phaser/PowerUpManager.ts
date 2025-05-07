@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { BaseManager } from './BaseManager';
+import { GameEvents } from './GameEvents';
 
 // Define the types of power-ups available in the game
 export enum PowerUpType {
@@ -57,8 +59,7 @@ export interface ActivePowerUp {
   isActive: boolean;
 }
 
-export class PowerUpManager {
-  private scene: Phaser.Scene;
+export class PowerUpManager extends BaseManager {
   private activePowerUps: ActivePowerUp[] = [];
   private hasShield: boolean = false;
   private powerUpChance: number = 0.05; // 5% chance for a word to be a power-up
@@ -72,7 +73,7 @@ export class PowerUpManager {
   private collectedPowerUpsContainer: Phaser.GameObjects.Container | null = null;
   
   constructor(scene: Phaser.Scene) {
-    this.scene = scene;
+    super(scene);
     // We'll call setupPowerUpIndicators in the scene's create method instead
   }
   
@@ -86,23 +87,8 @@ export class PowerUpManager {
       return;
     }
     
-    const { width } = this.scene.scale;
-    this.powerUpIndicators = this.scene.add.container(width - 150, 30);
-    
-    // Add a background for the power-up area
-    const bg = this.scene.add.rectangle(0, 0, 130, 40, 0x000000, 0.5)
-      .setOrigin(0, 0);
-    this.powerUpIndicators.add(bg);
-    
-    // Add a title
-    const title = this.scene.add.text(5, 5, 'POWER-UPS', {
-      fontFamily: '"Press Start 2P", cursive',
-      fontSize: '10px',
-      color: '#ffffff'
-    });
-    this.powerUpIndicators.add(title);
-    
-    // Setup collected power-ups display in bottom left
+    // We're removing the top-right power-up indicators
+    // Just set up the collected power-ups display in bottom left
     this.setupCollectedPowerUpsDisplay();
   }
   
@@ -116,49 +102,44 @@ export class PowerUpManager {
     
     const { width, height } = this.scene.scale;
     
-    // Create container for collected power-ups
-    this.collectedPowerUpsContainer = this.scene.add.container(30, height - 80);
+    // Create container for collected power-ups - position in bottom left
+    this.collectedPowerUpsContainer = this.scene.add.container(20, height - 100);
     
-    // Add background
-    const bg = this.scene.add.rectangle(0, 0, 200, 60, 0x000000, 0.5)
+    // Add background with higher alpha for better visibility
+    const bg = this.scene.add.rectangle(0, 0, 240, 90, 0x000000, 0.8)
       .setOrigin(0, 0);
     this.collectedPowerUpsContainer.add(bg);
     
-    // Add title
-    const title = this.scene.add.text(10, 5, 'POWER-UPS', {
-      fontFamily: '"Press Start 2P", cursive',
-      fontSize: '10px',
-      color: '#ffffff'
-    });
-    this.collectedPowerUpsContainer.add(title);
-    
-    // Add initial power-up counts (all zero)
-    let yOffset = 25;
+    // Add power-up counts with names only (no icons or title)
+    let yOffset = 10;
     Object.values(PowerUpType).forEach((type, index) => {
       const config = POWER_UP_CONFIGS[type];
-      const xOffset = (index % 2) * 100;
       
-      // Create power-up name and count text
-      const nameText = this.scene.add.text(10 + xOffset, yOffset, type, {
+      // Create power-up name
+      const nameText = this.scene.add.text(20, yOffset, type, {
         fontFamily: '"Press Start 2P", cursive',
-        fontSize: '10px',
+        fontSize: '14px',
         color: '#ffffff'
       }).setTint(config.color);
       
-      const countText = this.scene.add.text(10 + xOffset, yOffset + 15, `x${this.collectedPowerUps[type]}`, {
+      // Create count with x prefix
+      const countText = this.scene.add.text(180, yOffset, `x${this.collectedPowerUps[type]}`, {
         fontFamily: '"Press Start 2P", cursive',
-        fontSize: '10px',
+        fontSize: '16px',
         color: '#ffffff'
       });
       countText.name = `count-${type}`;
       
       this.collectedPowerUpsContainer.add([nameText, countText]);
       
-      // Adjust y offset for next row if needed
-      if (index % 2 === 1) {
-        yOffset += 35;
-      }
+      // Move to next row
+      yOffset += 22;
     });
+    
+    // Ensure the container is at the front
+    if (this.scene.children) {
+      this.scene.children.bringToTop(this.collectedPowerUpsContainer);
+    }
   }
   
   /**
@@ -222,25 +203,70 @@ export class PowerUpManager {
   }
   
   /**
-   * Activate a power-up when a power-up word is typed correctly
-   * @param powerUpType - The type of power-up to activate
+   * Collect a power-up when a power-up word is typed correctly
+   * @param powerUpType - The type of power-up to collect
    */
-  activatePowerUp(powerUpType: PowerUpType): void {
+  collectPowerUp(powerUpType: PowerUpType): void {
+    // Increment the count for this power-up type
+    this.collectedPowerUps[powerUpType]++;
+    
+    // Update the display
+    this.updateCollectedPowerUpDisplay(powerUpType);
+    
+    // Show collection effect
+    this.showPowerUpCollectedEffect(powerUpType);
+  }
+  
+  /**
+   * Show a visual effect when a power-up is collected
+   * @param powerUpType - The type of power-up collected
+   */
+  private showPowerUpCollectedEffect(powerUpType: PowerUpType): void {
+    const config = POWER_UP_CONFIGS[powerUpType];
+    const { width, height } = this.scene.scale;
+    
+    // Create a text object in the center of the screen
+    const effectText = this.scene.add.text(width / 2, height / 2, `${powerUpType.toUpperCase()} COLLECTED!`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '24px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setAlpha(0).setTint(config.color);
+    
+    // Create a fade in/out animation
+    this.scene.tweens.add({
+      targets: effectText,
+      alpha: { from: 0, to: 1 },
+      scale: { from: 0.5, to: 1.2 },
+      y: { from: height / 2, to: height / 2 - 50 },
+      duration: 500,
+      yoyo: true,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        effectText.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Activate a power-up from the collected inventory
+   * @param powerUpType - The type of power-up to activate
+   * @returns boolean - True if activation was successful
+   */
+  activatePowerUp(powerUpType: PowerUpType): boolean {
     const config = POWER_UP_CONFIGS[powerUpType];
     const now = this.scene.time.now;
     
     // Check if we have this power-up available
-    if (this.collectedPowerUps[powerUpType] <= 0 && powerUpType !== PowerUpType.SHIELD) {
-      // Don't activate if we don't have any (except for shield which can be collected)
-      return;
+    if (this.collectedPowerUps[powerUpType] <= 0) {
+      // Don't activate if we don't have any
+      return false;
     }
     
-    // Decrement the count if we're using a collected power-up
-    if (powerUpType !== PowerUpType.SHIELD || !this.hasShield) {
-      // Only decrement if it's not a shield or if shield isn't already active
-      this.collectedPowerUps[powerUpType]--;
-      this.updateCollectedPowerUpDisplay(powerUpType);
-    }
+    // Decrement the count
+    this.collectedPowerUps[powerUpType]--;
+    this.updateCollectedPowerUpDisplay(powerUpType);
     
     // Handle different power-up types
     switch (powerUpType) {
@@ -279,6 +305,8 @@ export class PowerUpManager {
         this.updatePowerUpIndicator(PowerUpType.SHIELD);
         break;
     }
+    
+    return true;
   }
   
   /**
@@ -343,45 +371,7 @@ export class PowerUpManager {
    * @param duration - Duration of the power-up (optional)
    */
   private updatePowerUpIndicator(type: PowerUpType, duration?: number): void {
-    if (!this.powerUpIndicators) return;
-    
-    const config = POWER_UP_CONFIGS[type];
-    const existingIndicator = this.powerUpIndicators.getByName(`indicator-${type}`);
-    
-    if (existingIndicator) {
-      // Update existing indicator
-      if (duration) {
-        // Update timer text
-        const timerText = existingIndicator.getByName('timer') as Phaser.GameObjects.Text;
-        if (timerText) {
-          timerText.setText(`${Math.ceil(duration / 1000)}s`);
-        }
-      }
-    } else {
-      // Create new indicator
-      const container = this.scene.add.container(5, 20);
-      container.name = `indicator-${type}`;
-      
-      // Add icon
-      const icon = this.scene.add.text(0, 0, config.icon, {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '16px'
-      });
-      container.add(icon);
-      
-      // Add timer text if applicable
-      if (duration) {
-        const timerText = this.scene.add.text(25, 2, `${Math.ceil(duration / 1000)}s`, {
-          fontFamily: '"Press Start 2P", cursive',
-          fontSize: '10px',
-          color: '#ffffff'
-        });
-        timerText.name = 'timer';
-        container.add(timerText);
-      }
-      
-      this.powerUpIndicators.add(container);
-    }
+    // We're not using the top-right indicators anymore
   }
   
   /**
@@ -389,12 +379,7 @@ export class PowerUpManager {
    * @param type - The type of power-up to remove
    */
   private removePowerUpIndicator(type: PowerUpType): void {
-    if (!this.powerUpIndicators) return;
-    
-    const indicator = this.powerUpIndicators.getByName(`indicator-${type}`);
-    if (indicator) {
-      indicator.destroy();
-    }
+    // We're not using the top-right indicators anymore
   }
   
   /**
@@ -416,13 +401,18 @@ export class PowerUpManager {
     if (countText) {
       countText.setText(`x${this.collectedPowerUps[type]}`);
       
-      // Add a nice animation effect when count increases
+      // Add a nice animation effect when count changes
       this.scene.tweens.add({
         targets: countText,
         scale: { from: 1.5, to: 1 },
         duration: 300,
         ease: 'Bounce.Out'
       });
+      
+      // Ensure the container is at the front
+      if (this.scene.children) {
+        this.scene.children.bringToTop(this.collectedPowerUpsContainer);
+      }
     }
   }
   
@@ -468,9 +458,10 @@ export class PowerUpManager {
   
   /**
    * Update power-up timers and states
-   * @param time - Current game time
+   * @param time - Current time
+   * @param delta - Time since last frame
    */
-  update(time: number): void {
+  update(time: number, delta: number): void {
     // Update active power-ups
     for (let i = this.activePowerUps.length - 1; i >= 0; i--) {
       const powerUp = this.activePowerUps[i];
@@ -502,19 +493,36 @@ export class PowerUpManager {
   }
   
   /**
-   * Get the collected power-ups count
-   * @returns Record of power-up counts by type
+   * Get the count of a specific power-up
+   * @param type - The type of power-up to check
+   * @returns number - The count of the power-up
    */
-  getCollectedPowerUps(): Record<PowerUpType, number> {
-    return { ...this.collectedPowerUps };
+  getCollectedCount(type: PowerUpType): number {
+    return this.collectedPowerUps[type];
   }
   
   /**
-   * Preserve power-ups when moving to the next level
-   * This should be called when transitioning between levels
+   * Check if a text matches a power-up name
+   * @param text - The text to check
+   * @returns PowerUpType | null - The matching power-up type or null if no match
    */
-  preservePowerUps(): void {
-    // We don't need to do anything special here since the counts are already preserved
-    // But we'll keep this method for clarity and potential future enhancements
+  getPowerUpTypeFromText(text: string): PowerUpType | null {
+    const lowerText = text.toLowerCase();
+    for (const type of Object.values(PowerUpType)) {
+      if (lowerText === type.toLowerCase()) {
+        return type;
+      }
+    }
+    return null;
+  }
+  
+  /**
+   * Bring the power-up displays to the front
+   */
+  bringToFront(): void {
+    // Bring collected power-ups display to front
+    if (this.collectedPowerUpsContainer && this.scene.children) {
+      this.scene.children.bringToTop(this.collectedPowerUpsContainer);
+    }
   }
 }
