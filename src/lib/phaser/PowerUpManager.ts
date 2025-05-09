@@ -111,7 +111,7 @@ export class PowerUpManager extends BaseManager {
     
     // Add power-up counts with names only (no icons or title)
     let yOffset = 10;
-    Object.values(PowerUpType).forEach((type, index) => {
+    Object.values(PowerUpType).forEach((type) => {
       const config = POWER_UP_CONFIGS[type];
       
       // Create power-up name
@@ -129,7 +129,9 @@ export class PowerUpManager extends BaseManager {
       });
       countText.name = `count-${type}`;
       
-      this.collectedPowerUpsContainer.add([nameText, countText]);
+      if (this.collectedPowerUpsContainer) {
+        this.collectedPowerUpsContainer.add([nameText, countText]);
+      }
       
       // Move to next row
       yOffset += 22;
@@ -265,7 +267,6 @@ export class PowerUpManager extends BaseManager {
           isActive: true
         });
         this.showPowerUpEffect('FREEZE!', config.color);
-        this.updatePowerUpIndicator(PowerUpType.FREEZE, config.duration);
         break;
         
       case PowerUpType.SLOW:
@@ -276,20 +277,20 @@ export class PowerUpManager extends BaseManager {
           isActive: true
         });
         this.showPowerUpEffect('SLOW!', config.color);
-        this.updatePowerUpIndicator(PowerUpType.SLOW, config.duration);
         break;
         
       case PowerUpType.BOMB:
         // Bomb is handled by the game scene directly
         this.showPowerUpEffect('BOMB!', config.color);
         // Signal to the game scene to destroy all words
-        (this.scene as any).triggerBombEffect();
+        if ('triggerBombEffect' in this.scene) {
+          (this.scene as { triggerBombEffect: () => void }).triggerBombEffect();
+        }
         break;
         
       case PowerUpType.SHIELD:
         this.hasShield = true;
         this.showPowerUpEffect('SHIELD!', config.color);
-        this.updatePowerUpIndicator(PowerUpType.SHIELD);
         break;
     }
     
@@ -329,7 +330,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Add particle effect around the text
-    if (this.scene.particles) {
+    if ('particles' in this.scene && this.scene.textures.exists('particle')) {
       const particles = this.scene.add.particles(0, 0, 'particle', {
         x: width / 2,
         y: height / 2,
@@ -350,23 +351,6 @@ export class PowerUpManager extends BaseManager {
         particles.destroy();
       });
     }
-  }
-  
-  /**
-   * Update the power-up indicator UI
-   * @param type - The type of power-up
-   * @param duration - Duration of the power-up (optional)
-   */
-  private updatePowerUpIndicator(type: PowerUpType, duration?: number): void {
-    // We're not using the top-right indicators anymore
-  }
-  
-  /**
-   * Remove a power-up indicator from the UI
-   * @param type - The type of power-up to remove
-   */
-  private removePowerUpIndicator(type: PowerUpType): void {
-    // We're not using the top-right indicators anymore
   }
   
   /**
@@ -418,7 +402,6 @@ export class PowerUpManager extends BaseManager {
    */
   useShield(): void {
     this.hasShield = false;
-    this.removePowerUpIndicator(PowerUpType.SHIELD);
     
     // Decrement the shield count if we have any
     if (this.collectedPowerUps[PowerUpType.SHIELD] > 0) {
@@ -446,9 +429,8 @@ export class PowerUpManager extends BaseManager {
   /**
    * Update power-up timers and states
    * @param time - Current time
-   * @param delta - Time since last frame
    */
-  update(time: number, delta: number): void {
+  update(time: number): void {
     // Update active power-ups
     for (let i = this.activePowerUps.length - 1; i >= 0; i--) {
       const powerUp = this.activePowerUps[i];
@@ -456,12 +438,7 @@ export class PowerUpManager extends BaseManager {
       // Check if power-up has expired
       if (time >= powerUp.endTime) {
         powerUp.isActive = false;
-        this.removePowerUpIndicator(powerUp.type);
         this.activePowerUps.splice(i, 1);
-      } else if (powerUp.isActive) {
-        // Update timer display
-        const remaining = Math.ceil((powerUp.endTime - time) / 1000);
-        this.updatePowerUpIndicator(powerUp.type, (powerUp.endTime - time));
       }
     }
   }

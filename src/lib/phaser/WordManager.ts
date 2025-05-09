@@ -49,11 +49,6 @@ export class WordManager extends BaseManager {
     // Initialize word pool
     this.refreshWordPool();
     
-    // Add debugging to check if eventEmitter is defined
-    console.log('WordManager constructor - scene:', scene);
-    console.log('WordManager constructor - this.scene:', this.scene);
-    console.log('WordManager constructor - this.eventEmitter:', this.eventEmitter);
-    
     // Only set up event listener if eventEmitter exists
     if (this.eventEmitter) {
       // Bind the method to preserve context
@@ -87,17 +82,13 @@ export class WordManager extends BaseManager {
    * @returns The created Word object
    */
   spawnRandomWord(): Word {
-    const { width, height } = this.scene.scale;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    
     // Calculate spawn position on edge of screen
     const spawnPosition = this.getRandomEdgePosition();
     
     // Determine if it's a special word
     let type = WordType.NORMAL;
     let wordText = '';
-    let effects: WordEffect[] = [];
+    const effects: WordEffect[] = [];
     
     // 5% chance for power-up
     if (Math.random() < this.powerUpChance) {
@@ -174,7 +165,8 @@ export class WordManager extends BaseManager {
     
     // Random position on edge
     const edge = Math.floor(Math.random() * 4); // 0: top, 1: right, 2: bottom, 3: left
-    let x: number, y: number;
+    let x = 0;
+    let y = 0;
     
     switch (edge) {
       case 0: // top
@@ -275,19 +267,22 @@ export class WordManager extends BaseManager {
   }
   
   /**
-   * Apply global effect to all words
-   * @param effect - Effect name
-   * @param params - Effect parameters
+   * Apply a global effect to all words
+   * @param effect - The effect to apply
+   * @param params - Parameters for the effect
    */
-  applyGlobalEffect(effect: string, params: any): void {
-    // Apply effects to all words (for power-ups)
+  applyGlobalEffect(effect: string, params: Record<string, unknown>): void {
+    // Apply effect to all words
     this.words.forEach(word => {
       switch (effect) {
         case 'freeze':
           word.setVelocity(0, 0);
           break;
         case 'slow':
-          word.setVelocity(word.velocity.x * params.factor, word.velocity.y * params.factor);
+          word.setVelocity(
+            word.velocity.x * (params.factor as number), 
+            word.velocity.y * (params.factor as number)
+          );
           break;
       }
     });

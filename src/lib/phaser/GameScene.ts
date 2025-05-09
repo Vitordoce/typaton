@@ -72,16 +72,13 @@ export default class GameScene extends Phaser.Scene {
 
   constructor() {
     super('GameScene');
-    console.log('GameScene constructor - this:', this);
-    console.log('GameScene constructor - this.events:', this.events);
     
     // Initialize managers after the scene is fully initialized
     this.triggerBombEffect = () => {}; // Default empty implementation
   }
   
   init() {
-    console.log('GameScene init - this:', this);
-    console.log('GameScene init - this.events:', this.events);
+    // Empty init method
   }
 
   create() {
@@ -231,7 +228,7 @@ export default class GameScene extends Phaser.Scene {
     const now = this.time.now;
 
     // Update power-up manager
-    this.powerUpManager.update(time, delta);
+    this.powerUpManager.update(time);
     
     // Only spawn new words during active gameplay
     if (this.isActivePlaying() && this.words.length < 5 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {

@@ -91,7 +91,7 @@ export class Word extends Phaser.GameObjects.Container {
    * @param y - Y velocity component
    */
   setVelocity(x: number, y: number): void {
-    this.velocity.set(x, y);
+    this.velocity = { x, y };
     
     // Emit event with word data when velocity is set
     this.scene.events.emit(GameEvents.WORD_VELOCITY_SET, this.getWordData());
@@ -175,7 +175,7 @@ export class Word extends Phaser.GameObjects.Container {
    */
   private updateEffects(time: number, delta: number): void {
     // Reset shake offset
-    this.shakeOffset.set(0, 0);
+    this.shakeOffset = { x: 0, y: 0 };
     
     // Apply effects
     for (const effect of this.effects) {
@@ -213,7 +213,7 @@ export class Word extends Phaser.GameObjects.Container {
     const shakeY = Phaser.Math.Between(-6, 6);
     const shakeRot = Phaser.Math.FloatBetween(-0.05, 0.05);
     
-    this.shakeOffset.set(shakeX, shakeY);
+    this.shakeOffset = { x: shakeX, y: shakeY };
     this.textObject.rotation = (this.flipAngle) + shakeRot;
   }
   

@@ -24,11 +24,11 @@ export default function About() {
         <section className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">How to Play</h2>
           <ol className="list-decimal pl-6 space-y-2">
-            <li>Words will appear on the screen one at a time</li>
-            <li>Type the word exactly as shown</li>
-            <li>Press Enter to submit your answer</li>
-            <li>Score points for each correct word</li>
-            <li>Try to get the highest score before time runs out!</li>
+            <li>Words will appear and move toward the center of the screen</li>
+            <li>Type the exact word to eliminate it before it reaches the center</li>
+            <li>Collect power-ups by typing the power-up words</li>
+            <li>Use power-ups by typing their name (freeze, slow, bomb, shield)</li>
+            <li>Complete each level by clearing the required number of words</li>
           </ol>
         </section>
         
