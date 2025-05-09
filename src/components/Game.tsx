@@ -47,7 +47,7 @@ export default function Game() {
         console.log('Creating game instance');
         try {
           // Dynamically import the PhaserGame module
-          const { default: PhaserGame } = await import('@/lib/phaser/PhaserGame');
+          const { default: PhaserGame } = await import('../lib/phaser/PhaserGame');
           gameInstanceRef.current = new PhaserGame('game-container', dimensions.width, dimensions.height);
         } catch (error) {
           console.error('Error loading Phaser game:', error);
