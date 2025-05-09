@@ -1,6 +1,5 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
-import { GameEvents } from './GameEvents';
 
 // Define the types of power-ups available in the game
 export enum PowerUpType {
@@ -100,7 +99,7 @@ export class PowerUpManager extends BaseManager {
       return;
     }
     
-    const { width, height } = this.scene.scale;
+    const { height } = this.scene.scale;
     
     // Create container for collected power-ups - position in bottom left
     this.collectedPowerUpsContainer = this.scene.add.container(20, height - 100);
@@ -167,18 +166,18 @@ export class PowerUpManager extends BaseManager {
    */
   applyPowerUpEffect(textObject: Phaser.GameObjects.Text, powerUpType: PowerUpType): void {
     // Store the power-up type on the text object for reference
-    (textObject as any).powerUpType = powerUpType;
+    (textObject as Phaser.GameObjects.Text & { powerUpType: PowerUpType }).powerUpType = powerUpType;
     
     // Mark as a power-up
-    (textObject as any).isPowerUp = true;
+    (textObject as Phaser.GameObjects.Text & { isPowerUp: boolean }).isPowerUp = true;
     
     // Create rainbow color cycling effect
-    const colors = [0xff0000, 0xff7f00, 0xffff00, 0x00ff00, 0x0000ff, 0x4b0082, 0x9400d3];
+    const colors = [ 0xff7f00, 0x9400d3, 0xffff00,0xff0000, 0x00ff00, 0x0000ff];
     let colorIndex = 0;
     
     // Create a timer for color cycling
     const colorTimer = this.scene.time.addEvent({
-      delay: 100,
+      delay: 400,
       callback: () => {
         textObject.setTint(colors[colorIndex]);
         colorIndex = (colorIndex + 1) % colors.length;
@@ -187,19 +186,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Store the timer on the text object so we can destroy it later
-    (textObject as any).colorTimer = colorTimer;
-    
-    // Create a blinking effect
-    const blinkTimer = this.scene.time.addEvent({
-      delay: 200,
-      callback: () => {
-        textObject.visible = !textObject.visible;
-      },
-      loop: true
-    });
-    
-    // Store the blink timer on the text object
-    (textObject as any).blinkTimer = blinkTimer;
+    (textObject as Phaser.GameObjects.Text & { colorTimer: Phaser.Time.TimerEvent }).colorTimer = colorTimer;
   }
   
   /**

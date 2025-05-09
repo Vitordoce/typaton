@@ -21,5 +21,6 @@ export enum GameEvents {
   LEVEL_STARTED = 'level-started',
   GAME_OVER = 'game-over',
   GAME_PAUSED = 'game-paused',
-  GAME_RESUMED = 'game-resumed'
+  GAME_RESUMED = 'game-resumed',
+  GAME_WIN = 'game-win',
 }

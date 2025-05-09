@@ -10,16 +10,16 @@ export class Word extends Phaser.GameObjects.Container {
   public text: string;
   public type: WordType;
   public effects: WordEffect[] = [];
-  public velocity: Phaser.Math.Vector2;
+  public velocity: { x: number, y: number } = { x: 0, y: 0 };
   public spawnTime: number;
   public destroyTime?: number;
   public completed: boolean = false;
   
   private textObject: Phaser.GameObjects.Text;
   private blinkTimer: number = 0;
-  private shakeOffset: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
+  private shakeOffset: { x: number, y: number } = { x: 0, y: 0 };
   private flipAngle: number = 0;
-  private basePosition: Phaser.Math.Vector2;
+  private basePosition: { x: number, y: number };
   private colorTimer: Phaser.Time.TimerEvent | null = null;
   
   constructor(scene: Phaser.Scene, config: WordConfig) {
@@ -28,15 +28,14 @@ export class Word extends Phaser.GameObjects.Container {
     this.text = config.text;
     this.type = config.type || WordType.NORMAL;
     this.effects = config.effects || [];
-    this.velocity = new Phaser.Math.Vector2(0, 0);
     this.spawnTime = scene.time.now;
-    this.basePosition = new Phaser.Math.Vector2(config.x, config.y);
+    this.basePosition = { x: config.x, y: config.y };
     
     // Create text display
     this.textObject = scene.add.text(0, 0, this.text, {
       fontFamily: '"Press Start 2P", cursive',
       fontSize: '24px',
-      color: this.getColorForType(),
+      color: 'white',
       stroke: '#000',
       strokeThickness: 6
     }).setOrigin(0.5);
@@ -152,18 +151,6 @@ export class Word extends Phaser.GameObjects.Container {
   }
   
   /**
-   * Get the appropriate color for the word type
-   */
-  private getColorForType(): string {
-    switch (this.type) {
-      case WordType.POWERUP:
-        return '#00ff00'; // Green for power-ups
-      default:
-        return '#ffffff'; // White for normal words
-    }
-  }
-  
-  /**
    * Update the word's position and effects
    * @param time - Current time
    * @param delta - Time since last frame in ms
@@ -222,8 +209,8 @@ export class Word extends Phaser.GameObjects.Container {
    * Update shaking effect
    */
   private updateShakingEffect(): void {
-    const shakeX = Phaser.Math.Between(-12, 12);
-    const shakeY = Phaser.Math.Between(-4, 4);
+    const shakeX = Phaser.Math.Between(-8, 8);
+    const shakeY = Phaser.Math.Between(-6, 6);
     const shakeRot = Phaser.Math.FloatBetween(-0.05, 0.05);
     
     this.shakeOffset.set(shakeX, shakeY);

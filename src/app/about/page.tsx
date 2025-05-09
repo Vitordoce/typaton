@@ -16,7 +16,7 @@ export default function About() {
             to earn points.
           </p>
           <p>
-            Whether you're a beginner looking to improve your typing skills or an experienced typist wanting
+            Whether you&apos;re a beginner looking to improve your typing skills or an experienced typist wanting
             to challenge yourself, Typaton offers an engaging way to practice.
           </p>
         </section>

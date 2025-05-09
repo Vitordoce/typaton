@@ -24,7 +24,7 @@ interface WordObject {
   shakeRot: number;
   // Power-up properties
   isPowerUp?: boolean;
-  powerUpType?: PowerUpType;
+  powerUpType?: PowerUpType | null;
   // Extensible: Add new bad condition properties here
   // Example: spinning?: boolean;
   // Example: colorShifting?: boolean;
@@ -43,8 +43,8 @@ export default class GameScene extends Phaser.Scene {
   private levelText: Phaser.GameObjects.Text | null = null;
   private levelCompleteText: Phaser.GameObjects.Text | null = null;
   private campaignComplete: boolean = false;
-  private wordManager: WordManager;
-  private powerUpManager: PowerUpManager;
+  private wordManager: WordManager = null!;
+  private powerUpManager: PowerUpManager = null!;
   private arcadeFontStyle = {
     fontFamily: '"Press Start 2P", cursive',
     fontSize: '24px', // larger for falling words
@@ -234,7 +234,7 @@ export default class GameScene extends Phaser.Scene {
     this.powerUpManager.update(time, delta);
     
     // Only spawn new words during active gameplay
-    if (this.isActivePlaying() && this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
+    if (this.isActivePlaying() && this.words.length < 5 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(now, centerX, centerY);
       this.lastSpawnTime = now;
     }
