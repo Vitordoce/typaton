@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { ScoreData, WordScoreDetail } from './ScoreManager';
+import { ScoreData, WordScoreDetail } from './types/ScoreTypes';
 
 /**
  * GameOverScreen class

@@ -1,10 +1,11 @@
 import * as Phaser from 'phaser';
 import { WordManager } from './WordManager';
-import { PowerUpManager, PowerUpType } from './PowerUpManager';
+import { PowerUpManager } from './PowerUpManager';
+import { PowerUpType } from './types/PowerUpTypes';
 import { ScoreManager } from './ScoreManager';
 import { GameOverScreen } from './GameOverScreen';
-import { WordType, WordEffect } from './WordData';
-import { GameEvents } from './GameEvents';
+import { WordType, WordEffect } from './types/WordData';
+import { GameEvents } from './types/GameEvents';
 
 // Define a proper type for word objects 
 interface WordObject {

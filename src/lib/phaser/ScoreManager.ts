@@ -1,52 +1,19 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
-import { GameEvents } from './GameEvents';
-import { WordData } from './WordData';
+import { GameEvents } from './types/GameEvents';
+import { WordData } from './types/WordData';
+import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes';
 
-/**
- * Interface for score data
- */
-export interface ScoreData {
-  totalScore: number;
-  wordCount: number;
-  averageTypingSpeed: number; // characters per second
-  highestWordScore: number;
-  wordScores: WordScoreDetail[];
-  levelScores: LevelScoreDetail[];
-  powerUpsUsed: number;
-  powerUpsCollected: number;
-}
-
-/**
- * Interface for detailed word score information
- */
-export interface WordScoreDetail {
-  word: string;
-  score: number;
-  basePoints: number;
-  lengthBonus: number;
-  velocityBonus: number;
-  typingSpeedBonus: number;
-  effectsBonus: number;
-  timeToType: number; // in milliseconds
-  typingSpeed: number; // characters per second
-}
-
-/**
- * Interface for level score information
- */
-export interface LevelScoreDetail {
-  level: number;
-  score: number;
-  wordCount: number;
-  averageTypingSpeed: number;
-}
+// Score interfaces are now imported from './types/ScoreTypes'
 
 /**
  * ScoreManager class
  * Responsible for calculating and tracking scores
  */
 export class ScoreManager extends BaseManager {
+  update(time: number, delta: number): void {
+    throw new Error('Method not implemented.');
+  }
   private totalScore: number = 0;
   private currentLevelScore: number = 0;
   private currentLevel: number = 1;

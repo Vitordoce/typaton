@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { WordType, WordEffect, WordData, WordConfig } from './WordData';
-import { GameEvents } from './GameEvents';
+import { WordType, WordEffect, WordData, WordConfig } from './types/WordData';
+import { GameEvents } from './types/GameEvents';
 
 /**
  * Word class representing a word in the game

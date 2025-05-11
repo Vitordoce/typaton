@@ -1,8 +1,8 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
 import { Word } from './Word';
-import { WordType, WordEffect, WordData, WordConfig } from './WordData';
-import { GameEvents } from './GameEvents';
+import { WordType, WordEffect, WordData, WordConfig } from './types/WordData';
+import { GameEvents } from './types/GameEvents';
 
 // Power-up words remain the same
 export const POWER_UP_WORDS = ['freeze', 'slow', 'bomb', 'shield'];
