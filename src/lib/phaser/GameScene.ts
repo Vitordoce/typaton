@@ -231,15 +231,6 @@ export default class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Bring power-up displays to the front of the display list
-   */
-  bringPowerUpsToFront(): void {
-    if (this.powerUpManager) {
-      this.powerUpManager.bringToFront();
-    }
-  }
-
-  /**
    * Check if the game is actively playing (not in game over, completion, or transition states)
    * This method provides a single place to check if gameplay mechanics should be active
    */
