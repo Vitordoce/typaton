@@ -7,7 +7,7 @@ export enum PowerUpType {
   FREEZE = 'freeze',
   BOMB = 'bomb',
   SHIELD = 'shield'
-  // BONUS = 'bonus' // Future power-up for double points
+  // BONUS = 'bonus' // Future power-up for double points - will be implemented later
 }
 
 // Interface for power-up configuration
