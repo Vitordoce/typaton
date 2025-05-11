@@ -67,6 +67,7 @@ export default class GameScene extends Phaser.Scene {
   private scoreText: Phaser.GameObjects.Text | null = null;
   private isLevelTransitioning: boolean = false;
   private levelWords: string[] = []; // Store words for current level
+  private usedWords: Set<string> = new Set(); // Track used words in current level
   
   // Method to trigger bomb effect (added in create)
   public triggerBombEffect: () => void;
@@ -93,6 +94,9 @@ export default class GameScene extends Phaser.Scene {
       minLength: settings.minWordLength,
       maxLength: settings.maxWordLength
     }) as string[];
+    
+    // Reset used words set
+    this.usedWords.clear();
   }
 
   constructor() {
@@ -440,13 +444,27 @@ export default class GameScene extends Phaser.Scene {
     if (Math.random() < 0.1) {
       isPowerUp = true;
       powerUpType = this.powerUpManager.getRandomPowerUpType();
-      
-      // Get a random word from the level words
-      wordValue = this.levelWords[Math.floor(Math.random() * this.levelWords.length)];
-    } else {
-      // Get a random word from the level words
-      wordValue = this.levelWords[Math.floor(Math.random() * this.levelWords.length)];
     }
+    
+    // Get a random unused word from the level words
+    let availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+    
+    // If we're running low on available words, generate more
+    if (availableWords.length < 5) {
+      const newWords = generate({
+        exactly: 20,
+        minLength: this.getLevelSettings().minWordLength,
+        maxLength: this.getLevelSettings().maxWordLength
+      }) as string[];
+      this.levelWords.push(...newWords);
+      availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+    }
+    
+    // Select a random word from available words
+    wordValue = availableWords[Math.floor(Math.random() * availableWords.length)];
+    
+    // Mark the word as used
+    this.usedWords.add(wordValue);
     
     // Make sure we have a valid word value
     const displayText = wordValue || 'error';
