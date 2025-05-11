@@ -11,8 +11,8 @@ import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes
  * Responsible for calculating and tracking scores
  */
 export class ScoreManager extends BaseManager {
-  update(): void {
-    throw new Error('Method not implemented.');
+  update(time: number, delta: number): void {
+    // No update logic needed for ScoreManager
   }
   private totalScore: number = 0;
   private currentLevelScore: number = 0;

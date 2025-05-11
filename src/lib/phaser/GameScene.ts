@@ -5,6 +5,7 @@ import { PowerUpType } from './types/PowerUpTypes';
 import { ScoreManager } from './ScoreManager';
 import { GameOverScreen } from './GameOverScreen';
 import { GameEvents } from './types/GameEvents';
+import { WordType, WordEffect } from './types/WordData';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -248,7 +249,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Update power-up manager
     if (this.powerUpManager) {
-      this.powerUpManager.update(time);
+      this.powerUpManager.update(time, delta);
     }
     
     // Check if freeze is active
@@ -656,14 +657,14 @@ export default class GameScene extends Phaser.Scene {
           const currentTime = this.time ? this.time.now : Date.now();
           const wordData = {
             text: wordValue,
-            type: isPowerUp ? 'powerup' : 'normal',
-            effects: this.getWordEffects(this.words[i]),
+            type: isPowerUp ? WordType.POWERUP : WordType.NORMAL,
+            effects: this.getWordEffects(this.words[i]) as WordEffect[],
             velocity: new Phaser.Math.Vector2(this.words[i].vx || 0, this.words[i].vy || 0),
             spawnTime: this.words[i].startTime || currentTime,
             destroyTime: currentTime,
             completed: true,
             position: new Phaser.Math.Vector2(this.words[i].text.x, this.words[i].text.y)
-          } as const;
+          };
           
           // Store the text object reference before removing from array
           const textObj = this.words[i].text;
@@ -788,8 +789,8 @@ export default class GameScene extends Phaser.Scene {
    * @param wordObj - The word object
    * @returns Array of word effects
    */
-  private getWordEffects(wordObj: WordObject): Array<{ type: string }> {
-    const effects: { type: string }[] = [];
+  private getWordEffects(wordObj: WordObject): WordEffect[] {
+    const effects: WordEffect[] = [];
     
     // Safety check for wordObj
     if (!wordObj) return effects;

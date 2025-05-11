@@ -98,14 +98,16 @@ export class PowerUpManager extends BaseManager {
       });
       countText.name = `count-${type}`;
       
-      this.collectedPowerUpsContainer.add([nameText, countText]);
+      if (this.collectedPowerUpsContainer) {
+        this.collectedPowerUpsContainer.add([nameText, countText]);
+      }
       
       // Move to next row
       yOffset += 22;
     });
     
     // Ensure the container is at the front
-    if (this.scene.children) {
+    if (this.scene.children && this.collectedPowerUpsContainer) {
       this.scene.children.bringToTop(this.collectedPowerUpsContainer);
     }
   }
@@ -309,7 +311,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Add particle effect around the text
-    if (this.scene.particles) {
+    if (this.scene.add && this.scene.add.particles) {
       const particles = this.scene.add.particles(0, 0, 'particle', {
         x: width / 2,
         y: height / 2,
@@ -430,7 +432,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Create particles for shield hit effect - fewer particles than break
-    if (this.scene.particles) {
+    if (this.scene.add && this.scene.add.particles) {
       const particles = this.scene.add.particles(0, 0, 'particle', {
         x: centerX,
         y: centerY,
@@ -494,7 +496,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Create particles for shield break effect - more particles and varied speeds
-    if (this.scene.particles) {
+    if (this.scene.add && this.scene.add.particles) {
       // First particle burst - outward explosion
       const particles1 = this.scene.add.particles(0, 0, 'particle', {
         x: centerX,
@@ -802,7 +804,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Add particle effect around the shield
-    if (this.scene.particles) {
+    if (this.scene.add && this.scene.add.particles) {
       const particles = this.scene.add.particles(0, 0, 'particle', {
         x: centerX,
         y: centerY,
