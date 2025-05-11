@@ -6,6 +6,7 @@ import { ScoreManager } from './ScoreManager';
 import { GameOverScreen } from './GameOverScreen';
 import { GameEvents } from './types/GameEvents';
 import { WordType, WordEffect } from './types/WordData';
+import { generate } from 'random-words';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -65,6 +66,7 @@ export default class GameScene extends Phaser.Scene {
   private score: number = 0;
   private scoreText: Phaser.GameObjects.Text | null = null;
   private isLevelTransitioning: boolean = false;
+  private levelWords: string[] = []; // Store words for current level
   
   // Method to trigger bomb effect (added in create)
   public triggerBombEffect: () => void;
@@ -72,10 +74,25 @@ export default class GameScene extends Phaser.Scene {
   // Level settings
   private getLevelSettings() {
     return {
-      minDuration: 5, // seconds (slowest word)
-      maxDuration: 10, // seconds (slowest word stays longest)
-      wordsToClear: 10 + (this.level - 1) * 3
+      minDuration: 5,
+      maxDuration: 10,
+      wordsToClear: 10 + (this.level - 1) * 3,
+      minWordLength: Math.min(3 + Math.floor(this.level / 2), 6), // Increase word length with level
+      maxWordLength: Math.min(5 + Math.floor(this.level / 2), 8)  // Cap at reasonable length
     };
+  }
+
+  // Generate words for the current level
+  private generateLevelWords() {
+    const settings = this.getLevelSettings();
+    const numWords = settings.wordsToClear * 2; // Generate more words than needed to have variety
+    
+    // Generate words with increasing difficulty based on level
+    this.levelWords = generate({
+      exactly: numWords,
+      minLength: settings.minWordLength,
+      maxLength: settings.maxWordLength
+    }) as string[];
   }
 
   constructor() {
@@ -86,7 +103,8 @@ export default class GameScene extends Phaser.Scene {
   }
   
   init() {
-    // Empty init method
+    // Generate initial level words
+    this.generateLevelWords();
   }
 
   create() {
@@ -418,29 +436,16 @@ export default class GameScene extends Phaser.Scene {
     let isPowerUp = false;
     let powerUpType = null;
     
-    // Word lists for fallback
-    const easyWords = ['cat', 'dog', 'run', 'jump', 'play', 'fast', 'slow', 'big', 'small', 'red'];
-    const mediumWords = ['computer', 'keyboard', 'monitor', 'program', 'function', 'variable'];
-    const hardWords = ['javascript', 'typescript', 'programming', 'development', 'application'];
-    
-    // 50% chance for any word to be a power-up
+    // 10% chance for any word to be a power-up
     if (Math.random() < 0.1) {
       isPowerUp = true;
       powerUpType = this.powerUpManager.getRandomPowerUpType();
       
-      // Use a random word based on difficulty level
-      const allWords = [...easyWords];
-      if (this.level >= 2) allWords.push(...mediumWords);
-      if (this.level >= 3) allWords.push(...hardWords);
-      
-      wordValue = allWords[Math.floor(Math.random() * allWords.length)];
+      // Get a random word from the level words
+      wordValue = this.levelWords[Math.floor(Math.random() * this.levelWords.length)];
     } else {
-      // Select a random word based on difficulty level
-      const allWords = [...easyWords];
-      if (this.level >= 2) allWords.push(...mediumWords);
-      if (this.level >= 3) allWords.push(...hardWords);
-      
-      wordValue = allWords[Math.floor(Math.random() * allWords.length)];
+      // Get a random word from the level words
+      wordValue = this.levelWords[Math.floor(Math.random() * this.levelWords.length)];
     }
     
     // Make sure we have a valid word value
@@ -458,11 +463,11 @@ export default class GameScene extends Phaser.Scene {
     const currentTime = this.time ? this.time.now : Date.now();
     const wordObj = {
       text: wordText,
-      value: displayText, // Use the validated display text
+      value: displayText,
       vx,
       vy,
       duration,
-      startTime: currentTime, // Use the current time from Phaser or fallback to Date.now()
+      startTime: currentTime,
       startX: spawnX,
       startY: spawnY,
       baseX: spawnX,
@@ -843,6 +848,9 @@ export default class GameScene extends Phaser.Scene {
       if (this.levelText) {
         this.levelText.setText(`LEVEL: ${this.level} / ${this.maxLevel}`);
       }
+      
+      // Generate new words for the next level
+      this.generateLevelWords();
       
       // Remove all words from screen
       for (const word of this.words) {

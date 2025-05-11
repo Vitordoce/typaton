@@ -7,7 +7,7 @@ import { ScoreData, WordScoreDetail } from './types/ScoreTypes';
  */
 export class GameOverScreen {
   private scene: Phaser.Scene;
-  private container: Phaser.GameObjects.Container;
+  private container: Phaser.GameObjects.Container | null = null;
   private scoreData: ScoreData;
   private isVisible: boolean = false;
   
@@ -46,11 +46,6 @@ export class GameOverScreen {
   
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.container = scene.add.container(0, 0);
-    this.container.setVisible(false);
-    this.isVisible = false;
-    
-    // Create a default empty score data
     this.scoreData = {
       totalScore: 0,
       wordCount: 0,
@@ -70,7 +65,7 @@ export class GameOverScreen {
   show(scoreData: ScoreData): void {
     this.scoreData = scoreData;
     this.createContent();
-    this.container.setVisible(true);
+    this.container?.setVisible(true);
     this.isVisible = true;
     
     // Add animation
@@ -91,9 +86,9 @@ export class GameOverScreen {
       alpha: 0,
       duration: 300,
       onComplete: () => {
-        this.container.setVisible(false);
+        this.container?.setVisible(false);
         this.isVisible = false;
-        this.container.removeAll(true);
+        this.container?.removeAll(true);
       }
     });
   }
@@ -103,7 +98,7 @@ export class GameOverScreen {
    * @returns True if visible
    */
   isShowing(): boolean {
-    return this.isVisible && this.container.visible;
+    return this.isVisible && this.container?.visible === true;
   }
   
   /**
@@ -111,19 +106,19 @@ export class GameOverScreen {
    */
   private createContent(): void {
     // Clear any existing content
-    this.container.removeAll(true);
+    this.container?.removeAll(true);
     
     const { width, height } = this.scene.scale;
     
     // Add semi-transparent background
     const bg = this.scene.add.rectangle(0, 0, width, height, 0x000000, 0.9)
       .setOrigin(0, 0);
-    this.container.add(bg);
+    this.container?.add(bg);
     
     // Add title
     const title = this.scene.add.text(width / 2, 60, 'GAME OVER', this.TITLE_STYLE)
       .setOrigin(0.5);
-    this.container.add(title);
+    this.container?.add(title);
     
     // Add total score
     const totalScore = this.scene.add.text(
@@ -132,7 +127,7 @@ export class GameOverScreen {
       `FINAL SCORE: ${this.scoreData.totalScore}`, 
       this.HEADER_STYLE
     ).setOrigin(0.5);
-    this.container.add(totalScore);
+    this.container?.add(totalScore);
     
     // Add summary statistics
     this.addSummaryStats(width / 2, 180);
@@ -152,7 +147,7 @@ export class GameOverScreen {
         this.scene.scene.restart();
       }
     );
-    this.container.add(restartButton);
+    this.container?.add(restartButton);
   }
   
   /**
@@ -176,7 +171,7 @@ export class GameOverScreen {
       statsContainer.add(text);
     });
     
-    this.container.add(statsContainer);
+    this.container?.add(statsContainer);
   }
   
   /**
@@ -211,7 +206,7 @@ export class GameOverScreen {
       levelContainer.add([levelText, detailText]);
     });
     
-    this.container.add(levelContainer);
+    this.container?.add(levelContainer);
   }
   
   /**
@@ -237,7 +232,7 @@ export class GameOverScreen {
       this.addWordScoreDetail(wordsContainer, wordScore, 50 + index * 60);
     });
     
-    this.container.add(wordsContainer);
+    this.container?.add(wordsContainer);
   }
   
   /**
