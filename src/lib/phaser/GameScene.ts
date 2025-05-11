@@ -220,6 +220,24 @@ export default class GameScene extends Phaser.Scene {
     this.time.delayedCall(500, () => {
       this.bringPowerUpsToFront();
     });
+    
+    // Preload particle texture if not already loaded
+    if (!this.textures.exists('particle')) {
+      const graphics = this.add.graphics();
+      graphics.fillStyle(0xffffff);
+      graphics.fillCircle(8, 8, 8);
+      graphics.generateTexture('particle', 16, 16);
+      graphics.destroy();
+    }
+  }
+
+  /**
+   * Bring power-up displays to the front of the display list
+   */
+  bringPowerUpsToFront(): void {
+    if (this.powerUpManager) {
+      this.powerUpManager.bringToFront();
+    }
   }
 
   /**
@@ -275,7 +293,7 @@ export default class GameScene extends Phaser.Scene {
         if (Math.sqrt(dx*dx + dy*dy) < 30) {
           // Check if shield is active
           if (this.powerUpManager && this.powerUpManager.hasActiveShield()) {
-            // Use shield instead of game over
+            // Use shield to block the hit but don't consume it (it's now indestructible for 2 seconds)
             this.powerUpManager.useShield();
             
             // Remove the word
