@@ -5,7 +5,7 @@ import { WordType, WordEffect, WordData, WordConfig } from './types/WordData';
 import { GameEvents } from './types/GameEvents';
 
 // Power-up words remain the same
-export const POWER_UP_WORDS = ['freeze', 'slow', 'bomb', 'shield'];
+export const POWER_UP_WORDS = ['freeze', 'bomb', 'shield'];
 
 /**
  * WordManager class
@@ -17,7 +17,6 @@ export class WordManager extends BaseManager {
   private score: number = 0;
   private powerUpChance: number = 0.05; // 5% chance for power-up
   private wordPool: string[] = [];
-  private powerUpChance: number = 0.5; // 50% chance for power-up
   
   constructor(scene: Phaser.Scene) {
     super(scene);
