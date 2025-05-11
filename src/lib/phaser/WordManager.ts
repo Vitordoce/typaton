@@ -4,33 +4,8 @@ import { Word } from './Word';
 import { WordType, WordEffect, WordData, WordConfig } from './WordData';
 import { GameEvents } from './GameEvents';
 
-// Word lists of varying difficulty
-export const WORD_LISTS = {
-  EASY: [
-    'cat', 'dog', 'run', 'jump', 'play', 'fast', 'slow', 'big', 'small', 'red',
-    'blue', 'green', 'walk', 'talk', 'eat', 'sleep', 'work', 'game', 'code', 'type'
-  ],
-  MEDIUM: [
-    'computer', 'keyboard', 'monitor', 'program', 'function', 'variable', 'constant',
-    'developer', 'software', 'hardware', 'network', 'internet', 'browser', 'server',
-    'client', 'database', 'algorithm', 'interface', 'library', 'framework'
-  ],
-  HARD: [
-    'javascript', 'typescript', 'programming', 'development', 'application', 'responsive',
-    'architecture', 'optimization', 'performance', 'experience', 'accessibility',
-    'authentication', 'authorization', 'implementation', 'documentation', 'configuration',
-    'integration', 'deployment', 'maintenance', 'refactoring'
-  ],
-  EXPERT: [
-    'asynchronous', 'serialization', 'internationalization', 'authentication',
-    'authorization', 'microservices', 'infrastructure', 'containerization',
-    'virtualization', 'orchestration', 'parallelization', 'encapsulation',
-    'polymorphism', 'inheritance', 'abstraction', 'implementation', 'functionality',
-    'compatibility', 'interoperability', 'sustainability'
-  ],
-  // Power-up words
-  POWERUPS: ['freeze', 'slow', 'bomb', 'shield']
-};
+// Power-up words remain the same
+export const POWER_UP_WORDS = ['freeze', 'slow', 'bomb', 'shield'];
 
 /**
  * WordManager class
@@ -40,14 +15,10 @@ export class WordManager extends BaseManager {
   private words: Word[] = [];
   private difficultyLevel: number = 1;
   private score: number = 0;
-  private wordPool: string[] = [];
   private powerUpChance: number = 0.05; // 5% chance for power-up
   
   constructor(scene: Phaser.Scene) {
     super(scene);
-    
-    // Initialize word pool
-    this.refreshWordPool();
     
     // Only set up event listener if eventEmitter exists
     if (this.eventEmitter) {
@@ -70,11 +41,107 @@ export class WordManager extends BaseManager {
     const word = new Word(this.scene, config);
     this.words.push(word);
     
+    // Calculate velocity based on word length and difficulty
+    const baseVelocity = this.calculateVelocityForWordLength(
+      config.text.length, 
+      this.difficultyLevel
+    );
+    
+    // Calculate direction vector to center
+    const { width, height } = this.scene.scale;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    const dirX = centerX - config.x;
+    const dirY = centerY - config.y;
+    
+    // Normalize and scale by calculated velocity
+    const length = Math.sqrt(dirX * dirX + dirY * dirY);
+    const velocityX = (dirX / length) * baseVelocity;
+    const velocityY = (dirY / length) * baseVelocity;
+    
     // Set velocity and emit event with word data
-    const velocity = this.calculateVelocityForDifficulty();
-    word.setVelocity(velocity.x, velocity.y);
+    word.setVelocity(velocityX, velocityY);
     
     return word;
+  }
+  
+  /**
+   * Calculate velocity based on word length
+   * @param wordLength - Length of the word
+   * @param baseDifficulty - Base difficulty level (1-4)
+   * @returns Velocity value
+   */
+  calculateVelocityForWordLength(wordLength: number, baseDifficulty: number = 1): number {
+    // Shorter words move faster, longer words move slower
+    // Base speed is affected by difficulty level
+    const baseSpeed = 40 + (baseDifficulty * 10);
+    
+    // Adjust speed based on word length (shorter = faster)
+    // Words of length 3-4 will be fastest, 10+ will be slowest
+    let speedFactor = 1.0;
+    
+    if (wordLength <= 4) {
+      speedFactor = 1.3; // Fastest
+    } else if (wordLength <= 6) {
+      speedFactor = 1.1; // Fast
+    } else if (wordLength <= 8) {
+      speedFactor = 0.9; // Medium
+    } else {
+      speedFactor = 0.7; // Slow
+    }
+    
+    return baseSpeed * speedFactor;
+  }
+  
+  /**
+   * Get a random word based on current difficulty level
+   * @returns Random word string
+   */
+  getRandomWord(): string {
+    // Word lists of varying difficulty
+    const WORD_LISTS = {
+      EASY: [
+        'cat', 'dog', 'run', 'jump', 'play', 'fast', 'slow', 'big', 'small', 'red',
+        'blue', 'green', 'walk', 'talk', 'eat', 'sleep', 'work', 'game', 'code', 'type'
+      ],
+      MEDIUM: [
+        'computer', 'keyboard', 'monitor', 'program', 'function', 'variable', 'constant',
+        'developer', 'software', 'hardware', 'network', 'internet', 'browser', 'server'
+      ],
+      HARD: [
+        'javascript', 'typescript', 'programming', 'development', 'application', 'responsive',
+        'architecture', 'optimization', 'performance', 'experience', 'accessibility'
+      ],
+      EXPERT: [
+        'asynchronous', 'serialization', 'internationalization', 'authentication',
+        'authorization', 'microservices', 'infrastructure', 'containerization'
+      ]
+    };
+    
+    // Create a pool of words based on difficulty level
+    let wordPool: string[] = [];
+    
+    // Add words based on current level
+    if (this.difficultyLevel >= 1) {
+      wordPool = wordPool.concat(WORD_LISTS.EASY);
+    }
+    
+    if (this.difficultyLevel >= 2) {
+      wordPool = wordPool.concat(WORD_LISTS.MEDIUM);
+    }
+    
+    if (this.difficultyLevel >= 3) {
+      wordPool = wordPool.concat(WORD_LISTS.HARD);
+    }
+    
+    if (this.difficultyLevel >= 4) {
+      wordPool = wordPool.concat(WORD_LISTS.EXPERT);
+    }
+    
+    // Get a random word from the pool
+    const randomIndex = Math.floor(Math.random() * wordPool.length);
+    return wordPool[randomIndex];
   }
   
   /**
@@ -93,12 +160,12 @@ export class WordManager extends BaseManager {
     // 5% chance for power-up
     if (Math.random() < this.powerUpChance) {
       type = WordType.POWERUP;
-      const powerUps = WordManager.getPowerUpWords();
-      wordText = powerUps[Math.floor(Math.random() * powerUps.length)];
+      wordText = POWER_UP_WORDS[Math.floor(Math.random() * POWER_UP_WORDS.length)];
       effects.push({ type: 'blinking' });
     }
-    // Normal word
+    // Normal word - get a random word with length based on difficulty
     else {
+      // Get a random word from our word lists
       wordText = this.getRandomWord();
       
       // Add random effects based on difficulty
@@ -127,33 +194,6 @@ export class WordManager extends BaseManager {
       x: spawnPosition.x,
       y: spawnPosition.y
     });
-  }
-  
-  /**
-   * Calculate velocity based on current difficulty
-   * @returns Velocity vector pointing toward center
-   */
-  private calculateVelocityForDifficulty(): Phaser.Math.Vector2 {
-    const { width, height } = this.scene.scale;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    
-    // Base speed increases with difficulty
-    const baseSpeed = 50 + (this.difficultyLevel * 10);
-    
-    // Get random edge position
-    const edgePosition = this.getRandomEdgePosition();
-    
-    // Calculate direction vector to center
-    const dirX = centerX - edgePosition.x;
-    const dirY = centerY - edgePosition.y;
-    
-    // Normalize and scale by speed
-    const length = Math.sqrt(dirX * dirX + dirY * dirY);
-    return new Phaser.Math.Vector2(
-      (dirX / length) * baseSpeed,
-      (dirY / length) * baseSpeed
-    );
   }
   
   /**
@@ -195,13 +235,18 @@ export class WordManager extends BaseManager {
    * @param wordData - Data of the completed word
    */
   handleWordCompleted(wordData: WordData): void {
-    // Simple scoring: one point per word
-    this.score++;
+    // Score based on word length - longer words give more points
+    const wordLength = wordData.text.length;
+    const pointsPerLetter = 10;
+    const points = wordLength * pointsPerLetter;
+    
+    this.score += points;
     
     // Emit score update event with word data
     this.eventEmitter.emit(GameEvents.SCORE_UPDATED, {
       score: this.score,
-      wordData: wordData
+      wordData: wordData,
+      pointsEarned: points
     });
   }
   
@@ -304,29 +349,11 @@ export class WordManager extends BaseManager {
   }
   
   /**
-   * Get a random word based on current difficulty level
-   * @returns Random word string
-   */
-  getRandomWord(): string {
-    if (this.wordPool.length === 0) {
-      this.refreshWordPool();
-    }
-    
-    // Get a random word from the pool and remove it
-    const randomIndex = Math.floor(Math.random() * this.wordPool.length);
-    const word = this.wordPool[randomIndex];
-    this.wordPool.splice(randomIndex, 1);
-    
-    return word;
-  }
-  
-  /**
    * Increase difficulty level
    */
   increaseLevel(): void {
     if (this.difficultyLevel < 4) {
       this.difficultyLevel++;
-      this.refreshWordPool();
     }
   }
   
@@ -336,7 +363,6 @@ export class WordManager extends BaseManager {
   resetLevel(): void {
     this.difficultyLevel = 1;
     this.score = 0;
-    this.refreshWordPool();
     
     // Clear all words
     this.words.forEach(word => word.destroy());
@@ -352,49 +378,11 @@ export class WordManager extends BaseManager {
   }
   
   /**
-   * Refresh the word pool based on current level
-   */
-  private refreshWordPool(): void {
-    this.wordPool = [];
-    
-    // Add words based on current level
-    if (this.difficultyLevel >= 1) {
-      this.wordPool = this.wordPool.concat(WORD_LISTS.EASY);
-    }
-    
-    if (this.difficultyLevel >= 2) {
-      this.wordPool = this.wordPool.concat(WORD_LISTS.MEDIUM);
-    }
-    
-    if (this.difficultyLevel >= 3) {
-      this.wordPool = this.wordPool.concat(WORD_LISTS.HARD);
-    }
-    
-    if (this.difficultyLevel >= 4) {
-      this.wordPool = this.wordPool.concat(WORD_LISTS.EXPERT);
-    }
-    
-    // Shuffle the word pool
-    this.shuffleArray(this.wordPool);
-  }
-  
-  /**
-   * Fisher-Yates shuffle algorithm
-   * @param array - Array to shuffle
-   */
-  private shuffleArray(array: string[]): void {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
-    }
-  }
-  
-  /**
    * Get all power-up words
    * @returns Array of power-up words
    */
   static getPowerUpWords(): string[] {
-    return WORD_LISTS.POWERUPS;
+    return POWER_UP_WORDS;
   }
   
   /**

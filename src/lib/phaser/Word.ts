@@ -55,7 +55,7 @@ export class Word extends Phaser.GameObjects.Container {
     
     // Emit spawn event with word data
     this.scene.events.emit(GameEvents.WORD_SPAWNED, this.getWordData());
-  }
+  } 
   
   /**
    * Apply rainbow color cycling effect for power-ups
@@ -228,13 +228,19 @@ export class Word extends Phaser.GameObjects.Container {
   
   /**
    * Mark the word as completed (typed correctly)
+   * @param score - Optional score to display
    */
-  complete(): void {
+  complete(score?: number): void {
     this.completed = true;
     this.destroyTime = this.scene.time.now;
     
     // Emit event with complete word data
     this.scene.events.emit(GameEvents.WORD_COMPLETED, this.getWordData());
+    
+    // Show score if provided
+    if (score !== undefined) {
+      this.showScoreAnimation(score);
+    }
     
     // Visual feedback for completion
     this.scene.tweens.add({
@@ -243,6 +249,34 @@ export class Word extends Phaser.GameObjects.Container {
       scale: 1.5,
       duration: 300,
       onComplete: () => this.destroy()
+    });
+  }
+  
+  /**
+   * Show score animation
+   * @param score - Score to display
+   */
+  private showScoreAnimation(score: number): void {
+    // Create score text
+    const scoreText = this.scene.add.text(0, -30, `+${score}`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '20px',
+      color: '#ffff00',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(50);
+    
+    // Add to container
+    this.add(scoreText);
+    
+    // Animate the score text
+    this.scene.tweens.add({
+      targets: scoreText,
+      y: -80,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 1, to: 1.5 },
+      duration: 1000,
+      ease: 'Power2'
     });
   }
   

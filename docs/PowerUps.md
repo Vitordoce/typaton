@@ -6,12 +6,12 @@ This document describes the power-up system in Typaton, including available powe
 
 The game features four distinct power-ups that provide different advantages to the player:
 
-| Power-Up | Icon | Color | Effect | Duration |
-|----------|------|-------|--------|----------|
-| FREEZE | ❄️ | Cyan | Freezes all words on screen | 3 seconds |
-| SLOW | 🐢 | Green | Reduces word speed by 50% | 5 seconds |
-| BOMB | 💣 | Red | Destroys all words on screen | Instant |
-| SHIELD | 🛡️ | Yellow | Protects from one missed word | Until hit |
+| Power-Up | Color | Effect | Duration |
+|----------|-------|--------|----------|
+| FREEZE | Cyan | Freezes all words on screen | 3 seconds |
+| SLOW | Green | Reduces word speed by 50% | 5 seconds |
+| BOMB | Red | Destroys all words on screen | Instant |
+| SHIELD | Yellow | Protects from one missed word | Until hit |
 
 ## How Power-Ups Work
 

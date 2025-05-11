@@ -12,39 +12,34 @@ export enum PowerUpType {
 // Interface for power-up configuration
 export interface PowerUpConfig {
   type: PowerUpType;
-  duration: number; // Duration in milliseconds (not used for BOMB and SHIELD)
-  icon: string; // Icon key for display
-  color: number; // Color for the power-up text/icon
-  description: string; // Short description of what the power-up does
+  duration: number; 
+  color: number; 
+  description: string;
 }
 
 // Power-up configurations
 export const POWER_UP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
   [PowerUpType.FREEZE]: {
     type: PowerUpType.FREEZE,
-    duration: 3000, // 3 seconds
-    icon: '❄️',
+    duration: 3000,
     color: 0x00ffff, // Cyan
     description: 'Freeze all words for 3 seconds'
   },
   [PowerUpType.SLOW]: {
     type: PowerUpType.SLOW,
     duration: 5000, // 5 seconds
-    icon: '🐢',
     color: 0x00ff00, // Green
     description: 'Slow all words by 50% for 5 seconds'
   },
   [PowerUpType.BOMB]: {
     type: PowerUpType.BOMB,
     duration: 0, // Instant effect
-    icon: '💣',
     color: 0xff0000, // Red
     description: 'Destroy all words on screen'
   },
   [PowerUpType.SHIELD]: {
     type: PowerUpType.SHIELD,
     duration: 0, // Until hit
-    icon: '🛡️',
     color: 0xffff00, // Yellow
     description: 'Protect from one hit'
   }

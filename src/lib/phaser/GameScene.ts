@@ -1,6 +1,10 @@
 import * as Phaser from 'phaser';
 import { WordManager } from './WordManager';
 import { PowerUpManager, PowerUpType } from './PowerUpManager';
+import { ScoreManager } from './ScoreManager';
+import { GameOverScreen } from './GameOverScreen';
+import { WordType, WordEffect } from './WordData';
+import { GameEvents } from './GameEvents';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -36,6 +40,7 @@ export default class GameScene extends Phaser.Scene {
   private words: WordObject[] = [];
   private gameOver: boolean = false;
   private gameOverText: Phaser.GameObjects.Text | null = null;
+  private isShowingGameOverScreen: boolean = false;
   private level: number = 1;
   private maxLevel: number = 5;
   private wordsCleared: number = 0;
@@ -45,6 +50,8 @@ export default class GameScene extends Phaser.Scene {
   private campaignComplete: boolean = false;
   private wordManager: WordManager = null!;
   private powerUpManager: PowerUpManager = null!;
+  private scoreManager: ScoreManager = null!;
+  private gameOverScreen: GameOverScreen = null!;
   private arcadeFontStyle = {
     fontFamily: '"Press Start 2P", cursive',
     fontSize: '24px', // larger for falling words
@@ -88,6 +95,8 @@ export default class GameScene extends Phaser.Scene {
     // Initialize managers here instead of in constructor
     this.wordManager = new WordManager(this);
     this.powerUpManager = new PowerUpManager(this);
+    this.scoreManager = new ScoreManager(this);
+    this.gameOverScreen = new GameOverScreen(this);
     
     const { width, height } = this.scale;
     this.level = 1;
@@ -100,8 +109,9 @@ export default class GameScene extends Phaser.Scene {
     this.lastSpawnTime = 0;
     this.score = 0;
 
-    // Reset WordManager
+    // Reset managers
     this.wordManager.resetLevel();
+    this.scoreManager.resetScores();
     
     // Initialize PowerUpManager
     this.powerUpManager.setupPowerUpIndicators();
@@ -225,10 +235,12 @@ export default class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const centerX = width / 2;
     const centerY = height - 40;
-    const now = this.time.now;
+    const now = this.time ? this.time.now : Date.now();
 
     // Update power-up manager
-    this.powerUpManager.update(time);
+    if (this.powerUpManager) {
+      this.powerUpManager.update(time);
+    }
     
     // Only spawn new words during active gameplay
     if (this.isActivePlaying() && this.words.length < 5 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
@@ -237,6 +249,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     for (let i = this.words.length - 1; i >= 0; i--) {
+      // Safety check for word object
+      if (!this.words[i] || !this.words[i].text) continue;
+      
       const wordObj = this.words[i];
       
       // Only update positions during active gameplay
@@ -255,7 +270,7 @@ export default class GameScene extends Phaser.Scene {
         const dy = wordObj.text.y - centerY;
         if (Math.sqrt(dx*dx + dy*dy) < 30) {
           // Check if shield is active
-          if (this.powerUpManager.hasActiveShield()) {
+          if (this.powerUpManager && this.powerUpManager.hasActiveShield()) {
             // Use shield instead of game over
             this.powerUpManager.useShield();
             
@@ -264,9 +279,9 @@ export default class GameScene extends Phaser.Scene {
             this.words.splice(i, 1);
           } else {
             this.gameOver = true;
-            if (this.gameOverText) {
-              this.gameOverText.setVisible(true);
-            }
+            
+            // Show enhanced game over screen with score data
+            this.showGameOverScreen();
           }
           break;
         }
@@ -368,7 +383,7 @@ export default class GameScene extends Phaser.Scene {
     wordObj.text.rotation = (wordObj.flipped ? wordObj.flipAngle : 0) + shakeRot;
   }
 
-  spawnWord(now: number, centerX: number, centerY: number) {
+  spawnWord(now: number = Date.now(), centerX: number, centerY: number) {
     const { width, height } = this.scale;
     const { minDuration, maxDuration } = this.getLevelSettings();
     const angleDeg = Phaser.Math.Between(30, 150);
@@ -390,18 +405,34 @@ export default class GameScene extends Phaser.Scene {
     let isPowerUp = false;
     let powerUpType = null;
     
+    // Word lists for fallback
+    const easyWords = ['cat', 'dog', 'run', 'jump', 'play', 'fast', 'slow', 'big', 'small', 'red'];
+    const mediumWords = ['computer', 'keyboard', 'monitor', 'program', 'function', 'variable'];
+    const hardWords = ['javascript', 'typescript', 'programming', 'development', 'application'];
+    
     // 5% chance for any word to be a power-up
     if (Math.random() < 0.05) {
       isPowerUp = true;
       powerUpType = this.powerUpManager.getRandomPowerUpType();
       
-      // Use a random word from the word pool, not necessarily the power-up name
-      wordValue = this.wordManager.getRandomWord();
+      // Use a random word based on difficulty level
+      const allWords = [...easyWords];
+      if (this.level >= 2) allWords.push(...mediumWords);
+      if (this.level >= 3) allWords.push(...hardWords);
+      
+      wordValue = allWords[Math.floor(Math.random() * allWords.length)];
     } else {
-      wordValue = this.wordManager.getRandomWord();
+      // Select a random word based on difficulty level
+      const allWords = [...easyWords];
+      if (this.level >= 2) allWords.push(...mediumWords);
+      if (this.level >= 3) allWords.push(...hardWords);
+      
+      wordValue = allWords[Math.floor(Math.random() * allWords.length)];
     }
     
-    const wordText = this.add.text(spawnX, spawnY, wordValue, {
+    // Make sure we have a valid word value
+    const displayText = wordValue || 'error';
+    const wordText = this.add.text(spawnX, spawnY, displayText, {
       ...this.arcadeFontStyle
     }).setOrigin(0.5);
     
@@ -411,13 +442,14 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Create word object with base properties
+    const currentTime = this.time ? this.time.now : Date.now();
     const wordObj = {
       text: wordText,
-      value: wordValue,
+      value: displayText, // Use the validated display text
       vx,
       vy,
       duration,
-      startTime: now,
+      startTime: currentTime, // Use the current time from Phaser or fallback to Date.now()
       startX: spawnX,
       startY: spawnY,
       baseX: spawnX,
@@ -486,20 +518,88 @@ export default class GameScene extends Phaser.Scene {
 
   handleKeyPress = (event: KeyboardEvent) => {
     if (this.gameOver || this.campaignComplete) return;
+    
+    // If game over screen is showing, handle restart
+    if (this.gameOverScreen.isShowing()) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        this.scene.restart();
+        return;
+      }
+    }
+    
     // Handle backspace
     if (event.key === 'Backspace') {
       this.inputText = this.inputText.slice(0, -1);
     }
+    // Ignore spacebar
+    else if (event.key === ' ' || event.key === 'Space') {
+      // Do nothing - ignore spaces
+      return;
+    }
     // Add character to input
     else if (event.key.length === 1) {
+      // First keypress on an empty input - start tracking typing time
+      if (this.inputText === '') {
+        // Find the closest matching word to start tracking
+        const matchingWord = this.findClosestMatchingWord(event.key.toLowerCase());
+        if (matchingWord && this.scoreManager && typeof this.scoreManager.startTyping === 'function') {
+          this.scoreManager.startTyping(matchingWord.value);
+          // Only emit event if it's defined
+          if (GameEvents && GameEvents.TYPING_STARTED) {
+            this.events.emit(GameEvents.TYPING_STARTED, matchingWord.value);
+          }
+        }
+      }
+      
       this.inputText += event.key.toLowerCase();
     }
+    
     // Update the input display
     if (this.inputDisplay) {
       this.inputDisplay.setText(this.inputText || '');
     }
+    
     // Check if input matches any word
     this.checkWordMatch();
+  }
+  
+  /**
+   * Find the closest matching word that starts with the given character
+   * @param char - The character to match
+   * @returns The matching word object or null
+   */
+  private findClosestMatchingWord(char: string): WordObject | null {
+    // Filter words that start with the character, with safety checks
+    const matchingWords = this.words.filter(word => 
+      word && word.value && typeof word.value === 'string' && 
+      word.value.toLowerCase().startsWith(char)
+    );
+    
+    if (matchingWords.length === 0) return null;
+    
+    // Find the closest word to the center
+    const { width, height } = this.scale;
+    const centerX = width / 2;
+    const centerY = height - 40;
+    
+    let closestWord = matchingWords[0];
+    let closestDistance = Infinity;
+    
+    for (const word of matchingWords) {
+      // Safety check for word and text properties
+      if (!word || !word.text) continue;
+      
+      const dx = word.text.x - centerX;
+      const dy = word.text.y - centerY;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestWord = word;
+      }
+    }
+    
+    return closestWord;
   }
 
   checkWordMatch() {
@@ -522,43 +622,179 @@ export default class GameScene extends Phaser.Scene {
     
     // If not a power-up activation, check for matching words
     for (let i = 0; i < this.words.length; i++) {
-      // Remove spaces from word value for matching
-      const normalizedWord = this.words[i].value.replace(/\s+/g, '');
-      if (normalizedInput === normalizedWord) {
-        // Check if it's a power-up word
-        const isPowerUp = this.words[i].isPowerUp;
-        const powerUpType = this.words[i].powerUpType;
+      // Safety check for word object
+      if (!this.words[i] || !this.words[i].text) continue;
+      
+      // Get the word value and normalize it (remove spaces, lowercase)
+      const wordValue = this.words[i].value || '';
+      const normalizedWord = wordValue.toLowerCase().replace(/\s+/g, '');
+      
+      // Check if input is a prefix of the word (partial match)
+      if (normalizedInput && normalizedWord.startsWith(normalizedInput)) {
+        // Highlight the word being typed
+        this.words[i].text.setTint(0xffff00);
         
-        // Remove the word
-        this.words[i].text.destroy();
-        this.words.splice(i, 1);
-        
-        // Clear input
-        this.inputText = '';
-        if (this.inputDisplay) {
-          this.inputDisplay.setText('');
+        // If the input exactly matches the word, complete it
+        if (normalizedInput === normalizedWord) {
+          // Check if it's a power-up word
+          const isPowerUp = this.words[i].isPowerUp;
+          const powerUpType = this.words[i].powerUpType;
+          
+          // Create word data for score calculation
+          const currentTime = this.time ? this.time.now : Date.now();
+          const wordData = {
+            text: wordValue,
+            type: isPowerUp ? 'powerup' : 'normal',
+            effects: this.getWordEffects(this.words[i]),
+            velocity: new Phaser.Math.Vector2(this.words[i].vx || 0, this.words[i].vy || 0),
+            spawnTime: this.words[i].startTime || currentTime,
+            destroyTime: currentTime,
+            completed: true,
+            position: new Phaser.Math.Vector2(this.words[i].text.x, this.words[i].text.y)
+          };
+          
+          // Store the text object reference before removing from array
+          const textObj = this.words[i].text;
+          
+          // Calculate enhanced score based on word length
+          const wordLength = wordValue.length;
+          const baseScore = wordLength * 10; // 10 points per letter
+          
+          // Add bonuses for longer words
+          let bonusMultiplier = 1.0;
+          
+          // Length bonus: 50% bonus per letter above 5
+          if (wordLength > 5) {
+            bonusMultiplier += (wordLength - 5) * 0.5;
+          }
+          
+          // Effect bonus: each effect adds a bonus
+          if (this.words[i].blinking) bonusMultiplier += 0.2;
+          if (this.words[i].shaking) bonusMultiplier += 0.3;
+          if (this.words[i].flipped) bonusMultiplier += 0.4;
+          
+          // Calculate final score with bonuses
+          const wordScore = Math.round(baseScore * bonusMultiplier);
+          
+          // Update score
+          this.score += wordScore;
+          
+          // Add completion effect with score
+          this.tweens.add({
+            targets: textObj,
+            alpha: 0,
+            y: textObj.y - 50,
+            scale: 1.5,
+            duration: 300,
+            onComplete: () => {
+              // Remove the word after the effect
+              textObj.destroy();
+            }
+          });
+          
+          // Show floating score text
+          const scoreText = this.add.text(textObj.x, textObj.y - 30, `+${wordScore}`, {
+            fontFamily: '"Press Start 2P", cursive',
+            fontSize: '20px',
+            color: '#ffff00',
+            stroke: '#000000',
+            strokeThickness: 4
+          }).setOrigin(0.5).setDepth(50);
+          
+          // Animate the score text
+          this.tweens.add({
+            targets: scoreText,
+            y: scoreText.y - 50,
+            alpha: { from: 1, to: 0 },
+            scale: { from: 1, to: 1.5 },
+            duration: 1000,
+            ease: 'Power2',
+            onComplete: () => {
+              scoreText.destroy();
+            }
+          });
+          
+          // Remove from active words array
+          this.words.splice(i, 1);
+          
+          // Clear input
+          this.inputText = '';
+          if (this.inputDisplay) {
+            this.inputDisplay.setText('');
+          }
+          
+          // If it's a power-up word, collect it instead of activating
+          if (isPowerUp && powerUpType) {
+            this.powerUpManager.collectPowerUp(powerUpType);
+          }
+          
+          // Track cleared words
+          this.wordsCleared++;
+          
+          // If ScoreManager is properly implemented, use it
+          if (this.scoreManager && typeof this.scoreManager.handleWordCompleted === 'function') {
+            this.scoreManager.handleWordCompleted(wordData);
+          }
+          
+          // Update score display
+          if (this.scoreText) {
+            this.scoreText.setText(`SCORE: ${this.score}`);
+          }
+          
+          // Update score display
+          if (this.scoreText) {
+            this.scoreText.setText(`SCORE: ${this.score}`);
+          }
+          
+          if (this.wordsCleared >= this.getLevelSettings().wordsToClear) {
+            this.levelComplete();
+          }
+          
+          // Play success sound if available
+          if (this.sound && this.sound.add) {
+            try {
+              const successSound = this.sound.add('success', { volume: 0.5 });
+              if (successSound) successSound.play();
+            } catch (e) {
+              // Ignore sound errors
+            }
+          }
+          
+          break;
         }
-        
-        // If it's a power-up word, collect it instead of activating
-        if (isPowerUp && powerUpType) {
-          this.powerUpManager.collectPowerUp(powerUpType);
+      } else {
+        // Reset tint if not matching
+        if (this.words[i] && this.words[i].text) {
+          this.words[i].text.clearTint();
         }
-        
-        // Track cleared words
-        this.wordsCleared++;
-        
-        // Increment score
-        this.score++;
-        if (this.scoreText) {
-          this.scoreText.setText(`SCORE: ${this.score}`);
-        }
-        
-        if (this.wordsCleared >= this.getLevelSettings().wordsToClear) {
-          this.levelComplete();
-        }
-        break;
       }
     }
+  }
+  
+  /**
+   * Get word effects from a word object
+   * @param wordObj - The word object
+   * @returns Array of word effects
+   */
+  private getWordEffects(wordObj: WordObject): { type: string }[] {
+    const effects: { type: string }[] = [];
+    
+    // Safety check for wordObj
+    if (!wordObj) return effects;
+    
+    if (wordObj.blinking) {
+      effects.push({ type: 'blinking' });
+    }
+    
+    if (wordObj.shaking) {
+      effects.push({ type: 'shaking' });
+    }
+    
+    if (wordObj.flipped) {
+      effects.push({ type: 'flipped' });
+    }
+    
+    return effects;
   }
 
   levelComplete() {
@@ -619,6 +855,9 @@ export default class GameScene extends Phaser.Scene {
    * @returns PowerUpType | null - The matching power-up type or null if no match
    */
   getPowerUpTypeFromText(text: string): PowerUpType | null {
+    // Safety check for text
+    if (!text || typeof text !== 'string') return null;
+    
     const lowerText = text.toLowerCase();
     for (const type of Object.values(PowerUpType)) {
       if (lowerText === type.toLowerCase()) {
@@ -632,6 +871,148 @@ export default class GameScene extends Phaser.Scene {
   bringPowerUpsToFront(): void {
     if (this.powerUpManager) {
       this.powerUpManager.bringToFront();
+    }
+  }
+  
+  /**
+   * Show floating score text at the given position
+   * @param x - X position
+   * @param y - Y position
+   * @param score - Score to display
+   */
+  private showFloatingScore(x: number, y: number, score: number): void {
+    // Create floating score text
+    const scoreText = this.add.text(x, y, `+${score}`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '20px',
+      color: '#ffff00',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(50);
+    
+    // Add floating animation
+    this.tweens.add({
+      targets: scoreText,
+      y: y - 80,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 1, to: 1.5 },
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        scoreText.destroy();
+      }
+    });
+  }
+  
+  /**
+   * Show the enhanced game over screen with detailed score information
+   */
+  private showGameOverScreen(): void {
+    // Ensure we only show the game over screen once
+    if (this.isShowingGameOverScreen) return;
+    
+    this.isShowingGameOverScreen = true;
+    console.log("Showing game over screen");
+    
+    // Hide the standard game over text
+    if (this.gameOverText) {
+      this.gameOverText.setVisible(false);
+    }
+    
+    try {
+      // Create a simple game over display
+      const { width, height } = this.scale;
+      
+      // Add semi-transparent background
+      const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.8)
+        .setOrigin(0, 0)
+        .setDepth(1000);
+      
+      // Add game over text
+      const gameOverTitle = this.add.text(width / 2, height / 3, 'GAME OVER', {
+        fontFamily: '"Press Start 2P", cursive',
+        fontSize: '48px',
+        color: '#ff0000',
+        stroke: '#000000',
+        strokeThickness: 6,
+        align: 'center'
+      }).setOrigin(0.5).setDepth(1001);
+      
+      // Add score text with larger font
+      const scoreText = this.add.text(width / 2, height / 2, `FINAL SCORE: ${this.score}`, {
+        fontFamily: '"Press Start 2P", cursive',
+        fontSize: '36px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+        align: 'center'
+      }).setOrigin(0.5).setDepth(1001);
+      
+      // Add words cleared text
+      const wordsText = this.add.text(width / 2, height / 2 + 60, `Words Typed: ${this.wordsCleared}`, {
+        fontFamily: '"Press Start 2P", cursive',
+        fontSize: '24px',
+        color: '#ffff00',
+        stroke: '#000000',
+        strokeThickness: 3,
+        align: 'center'
+      }).setOrigin(0.5).setDepth(101);
+      
+      // Add restart instruction
+      const restartText = this.add.text(width / 2, height - 100, 'Press ENTER or CLICK to restart', {
+        fontFamily: '"Press Start 2P", cursive',
+        fontSize: '20px',
+        color: '#00ffff',
+        stroke: '#000000',
+        strokeThickness: 3,
+        align: 'center'
+      }).setOrigin(0.5).setDepth(101);
+      
+      // Add blinking effect to restart text
+      this.tweens.add({
+        targets: restartText,
+        alpha: { from: 1, to: 0.3 },
+        duration: 800,
+        yoyo: true,
+        repeat: -1
+      });
+      
+      // Fade out all words
+      for (const word of this.words) {
+        if (word && word.text) {
+          this.tweens.add({
+            targets: word.text,
+            alpha: 0.2,
+            duration: 500
+          });
+        }
+      }
+      
+      // Add these elements to a container for easy management
+      const container = this.add.container(0, 0, [bg, gameOverTitle, scoreText, wordsText, restartText])
+        .setDepth(100);
+      
+      // Add scale-in animation
+      container.setScale(0.8);
+      this.tweens.add({
+        targets: container,
+        scale: 1,
+        duration: 500,
+        ease: 'Back.easeOut'
+      });
+      
+      // Make sure the container is interactive for click events
+      bg.setInteractive();
+      bg.on('pointerdown', () => {
+        this.scene.restart();
+      });
+      
+    } catch (error) {
+      console.error("Error showing game over screen:", error);
+      // Fallback to simple game over text
+      if (this.gameOverText) {
+        this.gameOverText.setVisible(true);
+      }
     }
   }
 }

@@ -9,6 +9,7 @@ export enum GameEvents {
   WORD_COMPLETED = 'word-completed',
   WORD_REACHED_CENTER = 'word-reached-center',
   WORD_VELOCITY_SET = 'word-velocity-set',
+  TYPING_STARTED = 'typing-started',
   
   // Power-up events
   POWERUP_ACTIVATED = 'powerup-activated',
