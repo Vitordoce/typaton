@@ -11,12 +11,6 @@ export const POWER_UP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     color: 0x00ffff, // Cyan
     description: 'Freeze all words for 3 seconds'
   },
-  [PowerUpType.SLOW]: {
-    type: PowerUpType.SLOW,
-    duration: 5000, // 5 seconds
-    color: 0x00ff00, // Green
-    description: 'Slow all words by 50% for 5 seconds'
-  },
   [PowerUpType.BOMB]: {
     type: PowerUpType.BOMB,
     duration: 0, // Instant effect
@@ -34,11 +28,10 @@ export const POWER_UP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
 export class PowerUpManager extends BaseManager {
   private activePowerUps: ActivePowerUp[] = [];
   private hasShield: boolean = false;
-  private powerUpChance: number = 0.05; // 5% chance for a word to be a power-up
+  private powerUpChance: number = 0.5; // 50% chance for a word to be a power-up
   private powerUpIndicators: Phaser.GameObjects.Container | null = null;
   private collectedPowerUps: Record<PowerUpType, number> = {
     [PowerUpType.FREEZE]: 0,
-    [PowerUpType.SLOW]: 0,
     [PowerUpType.BOMB]: 0,
     [PowerUpType.SHIELD]: 0
   };
@@ -253,17 +246,6 @@ export class PowerUpManager extends BaseManager {
         this.updatePowerUpIndicator(PowerUpType.FREEZE, config.duration);
         break;
         
-      case PowerUpType.SLOW:
-        this.activePowerUps.push({
-          type: PowerUpType.SLOW,
-          startTime: now,
-          endTime: now + config.duration,
-          isActive: true
-        });
-        this.showPowerUpEffect('SLOW!', config.color);
-        this.updatePowerUpIndicator(PowerUpType.SLOW, config.duration);
-        break;
-        
       case PowerUpType.BOMB:
         // Bomb is handled by the game scene directly
         this.showPowerUpEffect('BOMB!', config.color);
@@ -418,14 +400,6 @@ export class PowerUpManager extends BaseManager {
    */
   isFreezeActive(): boolean {
     return this.activePowerUps.some(p => p.type === PowerUpType.FREEZE && p.isActive);
-  }
-  
-  /**
-   * Get the current slow factor (0.5 if slow is active, 1.0 otherwise)
-   * @returns number - The slow factor to apply to word velocities
-   */
-  getSlowFactor(): number {
-    return this.activePowerUps.some(p => p.type === PowerUpType.SLOW && p.isActive) ? 0.5 : 1.0;
   }
   
   /**

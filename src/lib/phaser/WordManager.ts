@@ -16,6 +16,8 @@ export class WordManager extends BaseManager {
   private difficultyLevel: number = 1;
   private score: number = 0;
   private powerUpChance: number = 0.05; // 5% chance for power-up
+  private wordPool: string[] = [];
+  private powerUpChance: number = 0.5; // 50% chance for power-up
   
   constructor(scene: Phaser.Scene) {
     super(scene);
@@ -157,7 +159,7 @@ export class WordManager extends BaseManager {
     let wordText = '';
     const effects: WordEffect[] = [];
     
-    // 5% chance for power-up
+    // 50% chance for power-up
     if (Math.random() < this.powerUpChance) {
       type = WordType.POWERUP;
       wordText = POWER_UP_WORDS[Math.floor(Math.random() * POWER_UP_WORDS.length)];

@@ -243,8 +243,11 @@ export default class GameScene extends Phaser.Scene {
       this.powerUpManager.update(time);
     }
     
-    // Only spawn new words during active gameplay
-    if (this.isActivePlaying() && this.words.length < 5 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
+    // Check if freeze is active
+    const isFreezeActive = this.powerUpManager.isFreezeActive();
+    
+    // Only spawn new words during active gameplay AND when freeze is not active
+    if (this.isActivePlaying() && !isFreezeActive && this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(now, centerX, centerY);
       this.lastSpawnTime = now;
     }
@@ -255,8 +258,8 @@ export default class GameScene extends Phaser.Scene {
       
       const wordObj = this.words[i];
       
-      // Only update positions during active gameplay
-      if (this.isActivePlaying()) {
+      // Only update positions during active gameplay AND when freeze is not active
+      if (this.isActivePlaying() && !isFreezeActive) {
         // Update base position with velocity
         wordObj.baseX = wordObj.baseX + wordObj.vx * (delta / 1000);
         wordObj.baseY = wordObj.baseY + wordObj.vy * (delta / 1000);
@@ -411,8 +414,8 @@ export default class GameScene extends Phaser.Scene {
     const mediumWords = ['computer', 'keyboard', 'monitor', 'program', 'function', 'variable'];
     const hardWords = ['javascript', 'typescript', 'programming', 'development', 'application'];
     
-    // 5% chance for any word to be a power-up
-    if (Math.random() < 0.05) {
+    // 50% chance for any word to be a power-up
+    if (Math.random() < 0.1) {
       isPowerUp = true;
       powerUpType = this.powerUpManager.getRandomPowerUpType();
       
