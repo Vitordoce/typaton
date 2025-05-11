@@ -3,7 +3,6 @@
  */
 export enum PowerUpType {
   FREEZE = 'freeze',
-  SLOW = 'slow',
   BOMB = 'bomb',
   SHIELD = 'shield'
 }

@@ -9,7 +9,6 @@ The game features four distinct power-ups that provide different advantages to t
 | Power-Up | Color | Effect | Duration |
 |----------|-------|--------|----------|
 | FREEZE | Cyan | Freezes all words on screen | 3 seconds |
-| SLOW | Green | Reduces word speed by 50% | 5 seconds |
 | BOMB | Red | Destroys all words on screen | Instant |
 | SHIELD | Yellow | Protects from one missed word | Until hit |
 
@@ -28,7 +27,6 @@ The game features four distinct power-ups that provide different advantages to t
 Power-ups must be manually activated by the player. When activated:
 
 - **FREEZE**: All words on screen stop moving for 3 seconds
-- **SLOW**: All words move at half speed for 5 seconds
 - **BOMB**: Instantly destroys all words on screen
 - **SHIELD**: Provides protection from one missed word
 
