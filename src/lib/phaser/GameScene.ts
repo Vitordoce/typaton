@@ -4,7 +4,6 @@ import { PowerUpManager } from './PowerUpManager';
 import { PowerUpType } from './types/PowerUpTypes';
 import { ScoreManager } from './ScoreManager';
 import { GameOverScreen } from './GameOverScreen';
-import { WordType, WordEffect } from './types/WordData';
 import { GameEvents } from './types/GameEvents';
 
 // Define a proper type for word objects 
@@ -254,7 +253,7 @@ export default class GameScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const centerX = width / 2;
     const centerY = height - 40;
-    const now = this.time ? this.time.now : Date.now();
+    const currentTime = this.time ? this.time.now : Date.now();
 
     // Update power-up manager
     if (this.powerUpManager) {
@@ -265,9 +264,9 @@ export default class GameScene extends Phaser.Scene {
     const isFreezeActive = this.powerUpManager.isFreezeActive();
     
     // Only spawn new words during active gameplay AND when freeze is not active
-    if (this.isActivePlaying() && !isFreezeActive && this.words.length < 3 && (now - this.lastSpawnTime > 500 || this.words.length === 0)) {
-      this.spawnWord(now, centerX, centerY);
-      this.lastSpawnTime = now;
+    if (this.isActivePlaying() && !isFreezeActive && this.words.length < 3 && (currentTime - this.lastSpawnTime > 500 || this.words.length === 0)) {
+      this.spawnWord(currentTime, centerX, centerY);
+      this.lastSpawnTime = currentTime;
     }
 
     for (let i = this.words.length - 1; i >= 0; i--) {
@@ -405,7 +404,7 @@ export default class GameScene extends Phaser.Scene {
     wordObj.text.rotation = (wordObj.flipped ? wordObj.flipAngle : 0) + shakeRot;
   }
 
-  spawnWord(now: number = Date.now(), centerX: number, centerY: number) {
+  spawnWord(timestamp: number, centerX: number, centerY: number) {
     const { width, height } = this.scale;
     const { minDuration, maxDuration } = this.getLevelSettings();
     const angleDeg = Phaser.Math.Between(30, 150);
@@ -673,7 +672,7 @@ export default class GameScene extends Phaser.Scene {
             destroyTime: currentTime,
             completed: true,
             position: new Phaser.Math.Vector2(this.words[i].text.x, this.words[i].text.y)
-          };
+          } as const;
           
           // Store the text object reference before removing from array
           const textObj = this.words[i].text;
@@ -777,7 +776,7 @@ export default class GameScene extends Phaser.Scene {
             try {
               const successSound = this.sound.add('success', { volume: 0.5 });
               if (successSound) successSound.play();
-            } catch (e) {
+            } catch {
               // Ignore sound errors
             }
           }
@@ -798,7 +797,7 @@ export default class GameScene extends Phaser.Scene {
    * @param wordObj - The word object
    * @returns Array of word effects
    */
-  private getWordEffects(wordObj: WordObject): { type: string }[] {
+  private getWordEffects(wordObj: WordObject): Array<{ type: string }> {
     const effects: { type: string }[] = [];
     
     // Safety check for wordObj

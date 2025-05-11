@@ -3,12 +3,10 @@
  * Service for generating random words for the game
  */
 
-/**
- * Interface for the random word API response
- */
-interface RandomWordResponse {
-  word: string;
-}
+// This interface is commented out as it's not currently used but kept for documentation
+// interface RandomWordResponse {
+//   word: string;
+// }
 
 /**
  * Class responsible for generating random words

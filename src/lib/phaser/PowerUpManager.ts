@@ -1,6 +1,5 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
-import { GameEvents } from './types/GameEvents';
 import { PowerUpType, PowerUpConfig, ActivePowerUp } from './types/PowerUpTypes';
 
 // Power-up configurations
@@ -69,7 +68,7 @@ export class PowerUpManager extends BaseManager {
       return;
     }
     
-    const { width, height } = this.scene.scale;
+    const { height } = this.scene.scale;
     
     // Create container for collected power-ups - position in bottom left
     this.collectedPowerUpsContainer = this.scene.add.container(20, height - 100);
@@ -81,7 +80,7 @@ export class PowerUpManager extends BaseManager {
     
     // Add power-up counts with names only (no icons or title)
     let yOffset = 10;
-    Object.values(PowerUpType).forEach((type, index) => {
+    Object.values(PowerUpType).forEach((type) => {
       const config = POWER_UP_CONFIGS[type];
       
       // Create power-up name
@@ -136,10 +135,10 @@ export class PowerUpManager extends BaseManager {
    */
   applyPowerUpEffect(textObject: Phaser.GameObjects.Text, powerUpType: PowerUpType): void {
     // Store the power-up type on the text object for reference
-    (textObject as any).powerUpType = powerUpType;
+    (textObject as Phaser.GameObjects.Text & { powerUpType: PowerUpType }).powerUpType = powerUpType;
     
     // Mark as a power-up
-    (textObject as any).isPowerUp = true;
+    (textObject as Phaser.GameObjects.Text & { isPowerUp: boolean }).isPowerUp = true;
     
     // Create rainbow color cycling effect
     const colors = [0xff0000, 0xff7f00, 0xffff00, 0x00ff00, 0x0000ff, 0x4b0082, 0x9400d3];
@@ -156,7 +155,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Store the timer on the text object so we can destroy it later
-    (textObject as any).colorTimer = colorTimer;
+    (textObject as Phaser.GameObjects.Text & { colorTimer: Phaser.Time.TimerEvent }).colorTimer = colorTimer;
     
     // Create a blinking effect
     const blinkTimer = this.scene.time.addEvent({
@@ -168,7 +167,7 @@ export class PowerUpManager extends BaseManager {
     });
     
     // Store the blink timer on the text object
-    (textObject as any).blinkTimer = blinkTimer;
+    (textObject as Phaser.GameObjects.Text & { blinkTimer: Phaser.Time.TimerEvent }).blinkTimer = blinkTimer;
   }
   
   /**
@@ -254,7 +253,7 @@ export class PowerUpManager extends BaseManager {
         // Bomb is handled by the game scene directly
         this.showPowerUpEffect('BOMB!', config.color);
         // Signal to the game scene to destroy all words
-        (this.scene as any).triggerBombEffect();
+        (this.scene as Phaser.Scene & { triggerBombEffect: () => void }).triggerBombEffect();
         break;
         
       case PowerUpType.SHIELD:
@@ -335,18 +334,20 @@ export class PowerUpManager extends BaseManager {
   
   /**
    * Update the power-up indicator UI
-   * @param type - The type of power-up
-   * @param duration - Duration of the power-up (optional)
+   * @param powerUpType - The type of power-up
+   * @param remainingTime - Duration of the power-up (optional)
    */
-  private updatePowerUpIndicator(type: PowerUpType, duration?: number): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private updatePowerUpIndicator(powerUpType: PowerUpType, remainingTime?: number): void {
     // We're not using the top-right indicators anymore
   }
   
   /**
    * Remove a power-up indicator from the UI
-   * @param type - The type of power-up to remove
+   * @param powerUpType - The type of power-up to remove
    */
-  private removePowerUpIndicator(type: PowerUpType): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private removePowerUpIndicator(powerUpType: PowerUpType): void {
     // We're not using the top-right indicators anymore
   }
   
@@ -585,8 +586,13 @@ export class PowerUpManager extends BaseManager {
     // Remove the shield graphics and any attached particles
     if (this.shieldGraphics) {
       // Clean up any attached particles
-      if ((this.shieldGraphics as any).particles) {
-        (this.shieldGraphics as any).particles.destroy();
+      if (this.shieldGraphics && 'particles' in this.shieldGraphics) {
+        const graphicsWithParticles = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+          particles: Phaser.GameObjects.Particles.ParticleEmitter 
+        };
+        if (graphicsWithParticles.particles) {
+          graphicsWithParticles.particles.destroy();
+        }
       }
       this.shieldGraphics.destroy();
       this.shieldGraphics = null;
@@ -630,8 +636,7 @@ export class PowerUpManager extends BaseManager {
         this.removePowerUpIndicator(powerUp.type);
         this.activePowerUps.splice(i, 1);
       } else if (powerUp.isActive) {
-        // Update timer display
-        const remaining = Math.ceil((powerUp.endTime - time) / 1000);
+        // Update timer display (method uses underscore params to indicate they're unused)
         this.updatePowerUpIndicator(powerUp.type, (powerUp.endTime - time));
         
         // Update shield timer text if it exists
@@ -658,8 +663,13 @@ export class PowerUpManager extends BaseManager {
       }
       
       // Clean up any attached particles
-      if (this.shieldGraphics && (this.shieldGraphics as any).particles) {
-        (this.shieldGraphics as any).particles.destroy();
+      if (this.shieldGraphics && 'particles' in this.shieldGraphics) {
+        const graphicsWithParticles = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+          particles: Phaser.GameObjects.Particles.ParticleEmitter 
+        };
+        if (graphicsWithParticles.particles) {
+          graphicsWithParticles.particles.destroy();
+        }
       }
       
       if (this.shieldGraphics) {
@@ -806,7 +816,9 @@ export class PowerUpManager extends BaseManager {
       });
       
       // Store the particles on the shield graphics for cleanup
-      (this.shieldGraphics as any).particles = particles;
+      (this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+        particles: Phaser.GameObjects.Particles.ParticleEmitter 
+      }).particles = particles;
     }
     
     // Add timer text above the shield
