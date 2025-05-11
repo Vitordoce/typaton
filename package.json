@@ -11,11 +11,12 @@
     "postinstall": "[ -f node_modules/next/dist/compiled/regenerator-runtime/runtime.js ] || npm install"
   },
   "dependencies": {
+    "autoprefixer": "^10.4.16",
     "next": "^15.0.0",
     "phaser": "^3.88.2",
+    "random-words": "^2.0.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "autoprefixer": "^10.4.16"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",

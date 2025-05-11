@@ -25,16 +25,14 @@ export const POWER_UP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
 };
 
 export class PowerUpManager extends BaseManager {
-  private activePowerUps: ActivePowerUp[] = [];
+  private activePowerUps: Map<PowerUpType, boolean> = new Map();
+  private collectedPowerUps: Map<PowerUpType, number> = new Map();
+  private powerUpIndicators: Map<PowerUpType, Phaser.GameObjects.Text> = new Map();
+  private freezeTimer: number = 0;
+  private shieldTimer: number = 0;
   private hasShield: boolean = false;
   private shieldEndTime: number = 0;
   private powerUpChance: number = 0.5; // 50% chance for a word to be a power-up
-  private powerUpIndicators: Phaser.GameObjects.Container | null = null;
-  private collectedPowerUps: Record<PowerUpType, number> = {
-    [PowerUpType.FREEZE]: 0,
-    [PowerUpType.BOMB]: 0,
-    [PowerUpType.SHIELD]: 0
-  };
   private collectedPowerUpsContainer: Phaser.GameObjects.Container | null = null;
   private shieldGraphics: Phaser.GameObjects.Graphics | null = null;
   private shieldAnimation: Phaser.Tweens.Tween | null = null;
@@ -42,7 +40,14 @@ export class PowerUpManager extends BaseManager {
   
   constructor(scene: Phaser.Scene) {
     super(scene);
-    // We'll call setupPowerUpIndicators in the scene's create method instead
+    this.initializePowerUps();
+  }
+  
+  private initializePowerUps(): void {
+    Object.values(PowerUpType).forEach(type => {
+      this.activePowerUps.set(type, false);
+      this.collectedPowerUps.set(type, 0);
+    });
   }
   
   /**
@@ -91,7 +96,7 @@ export class PowerUpManager extends BaseManager {
       }).setTint(config.color);
       
       // Create count with x prefix
-      const countText = this.scene.add.text(180, yOffset, `x${this.collectedPowerUps[type]}`, {
+      const countText = this.scene.add.text(180, yOffset, `x${this.collectedPowerUps.get(type) || 0}`, {
         fontFamily: '"Press Start 2P", cursive',
         fontSize: '16px',
         color: '#ffffff'
@@ -177,13 +182,9 @@ export class PowerUpManager extends BaseManager {
    * @param powerUpType - The type of power-up to collect
    */
   collectPowerUp(powerUpType: PowerUpType): void {
-    // Increment the count for this power-up type
-    this.collectedPowerUps[powerUpType]++;
-    
-    // Update the display
+    const currentCount = this.collectedPowerUps.get(powerUpType) || 0;
+    this.collectedPowerUps.set(powerUpType, currentCount + 1);
     this.updateCollectedPowerUpDisplay(powerUpType);
-    
-    // Show collection effect
     this.showPowerUpCollectedEffect(powerUpType);
   }
   
@@ -229,26 +230,22 @@ export class PowerUpManager extends BaseManager {
     const now = this.scene.time.now;
     
     // Check if we have this power-up available
-    if (this.collectedPowerUps[powerUpType] <= 0) {
+    if (this.collectedPowerUps.get(powerUpType) <= 0) {
       // Don't activate if we don't have any
       return false;
     }
     
     // Decrement the count
-    this.collectedPowerUps[powerUpType]--;
+    this.collectedPowerUps.set(powerUpType, (this.collectedPowerUps.get(powerUpType) || 0) - 1);
     this.updateCollectedPowerUpDisplay(powerUpType);
     
     // Handle different power-up types
     switch (powerUpType) {
       case PowerUpType.FREEZE:
-        this.activePowerUps.push({
-          type: PowerUpType.FREEZE,
-          startTime: now,
-          endTime: now + config.duration,
-          isActive: true
-        });
+        this.activePowerUps.set(PowerUpType.FREEZE, true);
         this.showPowerUpEffect('FREEZE!', config.color);
         this.updatePowerUpIndicator(PowerUpType.FREEZE, config.duration);
+        this.freezeTimer = now + config.duration;
         break;
         
       case PowerUpType.BOMB:
@@ -264,14 +261,7 @@ export class PowerUpManager extends BaseManager {
         this.showPowerUpEffect('SHIELD!', config.color);
         this.updatePowerUpIndicator(PowerUpType.SHIELD, config.duration);
         this.createShieldAnimation();
-        
-        // Add shield to active power-ups for tracking
-        this.activePowerUps.push({
-          type: PowerUpType.SHIELD,
-          startTime: now,
-          endTime: this.shieldEndTime,
-          isActive: true
-        });
+        this.shieldTimer = config.duration;
         break;
     }
     
@@ -372,7 +362,7 @@ export class PowerUpManager extends BaseManager {
     
     const countText = this.collectedPowerUpsContainer.getByName(`count-${type}`) as Phaser.GameObjects.Text;
     if (countText) {
-      countText.setText(`x${this.collectedPowerUps[type]}`);
+      countText.setText(`x${this.collectedPowerUps.get(type) || 0}`);
       
       // Add a nice animation effect when count changes
       this.scene.tweens.add({
@@ -395,7 +385,7 @@ export class PowerUpManager extends BaseManager {
    * @param count - The new count value
    */
   updateCollectedPowerUpCount(type: PowerUpType, count: number): void {
-    this.collectedPowerUps[type] = count;
+    this.collectedPowerUps.set(type, count);
     this.updateCollectedPowerUpDisplay(type);
   }
   
@@ -612,7 +602,7 @@ export class PowerUpManager extends BaseManager {
    * @returns boolean - True if freeze is active
    */
   isFreezeActive(): boolean {
-    return this.activePowerUps.some(p => p.type === PowerUpType.FREEZE && p.isActive);
+    return this.activePowerUps.get(PowerUpType.FREEZE) || false;
   }
   
   /**
@@ -627,7 +617,7 @@ export class PowerUpManager extends BaseManager {
       
       // Check if power-up has expired
       if (time >= powerUp.endTime) {
-        powerUp.isActive = false;
+        this.activePowerUps.set(powerUp.type, false);
         
         // If this is a shield that expired, remove it
         if (powerUp.type === PowerUpType.SHIELD) {
@@ -697,7 +687,9 @@ export class PowerUpManager extends BaseManager {
    */
   destroy(): void {
     if (this.powerUpIndicators) {
-      this.powerUpIndicators.destroy();
+      this.powerUpIndicators.forEach((indicator) => {
+        indicator.destroy();
+      });
     }
     if (this.collectedPowerUpsContainer) {
       this.collectedPowerUpsContainer.destroy();
@@ -714,7 +706,7 @@ export class PowerUpManager extends BaseManager {
       this.shieldTimerText.destroy();
       this.shieldTimerText = null;
     }
-    this.activePowerUps = [];
+    this.activePowerUps.clear();
   }
   
   /**
@@ -723,7 +715,7 @@ export class PowerUpManager extends BaseManager {
    * @returns number - The count of the power-up
    */
   getCollectedCount(type: PowerUpType): number {
-    return this.collectedPowerUps[type];
+    return this.collectedPowerUps.get(type) || 0;
   }
   
   /**

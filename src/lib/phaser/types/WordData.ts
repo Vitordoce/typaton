@@ -4,15 +4,15 @@ import * as Phaser from 'phaser';
  * Enum for word types
  */
 export enum WordType {
-  NORMAL = 'normal',
-  POWERUP = 'powerup'
+  NORMAL = 'NORMAL',
+  POWERUP = 'POWERUP'
 }
 
 /**
  * Interface for word effects (bad conditions)
  */
 export interface WordEffect {
-  type: 'blinking' | 'shaking' | 'flipped' | 'fading' | 'rotating';
+  type: 'blinking' | 'shaking' | 'flipped';
   intensity?: number;
   duration?: number;
 }

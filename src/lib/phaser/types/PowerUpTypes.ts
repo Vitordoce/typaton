@@ -2,9 +2,9 @@
  * Define the types of power-ups available in the game
  */
 export enum PowerUpType {
-  FREEZE = 'freeze',
-  BOMB = 'bomb',
-  SHIELD = 'shield'
+  FREEZE = 'FREEZE',
+  SHIELD = 'SHIELD',
+  BOMB = 'BOMB'
 }
 
 /**

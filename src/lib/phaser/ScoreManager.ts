@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
 import { GameEvents } from './types/GameEvents';
-import { WordData } from './types/WordData';
+import { WordData, WordType, WordEffect } from './types/WordData';
 import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes';
 
 // Score interfaces are now imported from './types/ScoreTypes'
@@ -27,6 +27,8 @@ export class ScoreManager extends BaseManager {
   private wordCount: number = 0;
   private totalTypingTime: number = 0;
   private totalCharactersTyped: number = 0;
+  private combo: number = 0;
+  private maxCombo: number = 0;
   
   // Scoring constants
   private readonly BASE_POINTS_PER_LETTER = 10;
@@ -66,41 +68,70 @@ export class ScoreManager extends BaseManager {
    * Handle word completion event
    * @param wordData - Data of the completed word
    */
-  handleWordCompleted(wordData: WordData): void {
-    const now = this.scene.time.now;
-    const timeToType = now - this.typingStartTime;
-    const typingSpeed = this.calculateTypingSpeed(wordData.text, timeToType);
-    
-    // Calculate score components
-    const basePoints = this.calculateBasePoints(wordData.text);
-    const lengthBonus = this.calculateLengthBonus(wordData.text);
-    const velocityBonus = this.calculateVelocityBonus(wordData.velocity.length());
-    const typingSpeedBonus = this.calculateTypingSpeedBonus(typingSpeed);
-    const effectsBonus = this.calculateEffectsBonus(wordData.effects);
-    
-    // Calculate total word score
-    const wordScore = Math.round(
-      basePoints * (1 + lengthBonus + velocityBonus + typingSpeedBonus + effectsBonus)
-    );
-    
+  handleWordCompleted(wordData: {
+    text: string;
+    type: WordType;
+    effects: WordEffect[];
+    velocity: Phaser.Math.Vector2;
+    spawnTime: number;
+    destroyTime: number;
+    completed: boolean;
+    position: Phaser.Math.Vector2;
+  }): void {
+    // Calculate base score
+    let wordScore = wordData.text.length * 10;
+
+    // Add combo bonus
+    this.combo++;
+    if (this.combo > this.maxCombo) {
+      this.maxCombo = this.combo;
+    }
+    wordScore *= (1 + (this.combo * 0.1)); // 10% bonus per combo level
+
+    // Add effect bonuses
+    wordData.effects.forEach(effect => {
+      switch (effect.type) {
+        case 'blinking':
+          wordScore *= 1.2;
+          break;
+        case 'shaking':
+          wordScore *= 1.3;
+          break;
+        case 'flipped':
+          wordScore *= 1.4;
+          break;
+      }
+    });
+
+    // Add speed bonus
+    const typingTime = wordData.destroyTime - this.typingStartTime;
+    if (typingTime < 1000) { // Less than 1 second
+      wordScore *= 1.5;
+    } else if (typingTime < 2000) { // Less than 2 seconds
+      wordScore *= 1.2;
+    }
+
+    // Round the final score
+    wordScore = Math.round(wordScore);
+
     // Update totals
     this.totalScore += wordScore;
     this.currentLevelScore += wordScore;
     this.wordCount++;
-    this.totalTypingTime += timeToType;
+    this.totalTypingTime += typingTime;
     this.totalCharactersTyped += wordData.text.length;
     
     // Store detailed word score
     this.wordScores.push({
       word: wordData.text,
       score: wordScore,
-      basePoints,
-      lengthBonus: Math.round(basePoints * lengthBonus),
-      velocityBonus: Math.round(basePoints * velocityBonus),
-      typingSpeedBonus: Math.round(basePoints * typingSpeedBonus),
-      effectsBonus: Math.round(basePoints * effectsBonus),
-      timeToType,
-      typingSpeed
+      basePoints: wordData.text.length * this.BASE_POINTS_PER_LETTER,
+      lengthBonus: Math.round(wordData.text.length * this.BASE_POINTS_PER_LETTER * this.LENGTH_BONUS_MULTIPLIER),
+      velocityBonus: Math.round(wordData.text.length * this.BASE_POINTS_PER_LETTER * this.VELOCITY_BONUS_MULTIPLIER),
+      typingSpeedBonus: Math.round(wordScore - wordData.text.length * this.BASE_POINTS_PER_LETTER),
+      effectsBonus: this.calculateEffectsBonus(wordData.effects),
+      timeToType: typingTime,
+      typingSpeed: wordData.text.length / (typingTime / 1000)
     });
     
     // Emit score update event
@@ -113,6 +144,9 @@ export class ScoreManager extends BaseManager {
     // Reset typing tracking
     this.typingStartTime = 0;
     this.currentTypingWord = '';
+
+    // Show floating score
+    this.showFloatingScore(wordData.position.x, wordData.position.y, wordScore);
   }
   
   /**
@@ -280,6 +314,8 @@ export class ScoreManager extends BaseManager {
     this.totalCharactersTyped = 0;
     this.powerUpsCollected = 0;
     this.powerUpsUsed = 0;
+    this.combo = 0;
+    this.maxCombo = 0;
   }
   
   /**
@@ -293,5 +329,39 @@ export class ScoreManager extends BaseManager {
     this.eventEmitter.off(GameEvents.POWERUP_ACTIVATED, this.handlePowerUpActivated, this);
     
     super.destroy();
+  }
+
+  private showFloatingScore(x: number, y: number, score: number): void {
+    const scoreText = this.scene.add.text(x, y, `+${score}`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '20px',
+      color: '#ffff00',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(50);
+
+    this.scene.tweens.add({
+      targets: scoreText,
+      y: y - 50,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 1, to: 1.5 },
+      duration: 1000,
+      ease: 'Power2',
+      onComplete: () => {
+        scoreText.destroy();
+      }
+    });
+  }
+
+  public getCombo(): number {
+    return this.combo;
+  }
+
+  public getMaxCombo(): number {
+    return this.maxCombo;
+  }
+
+  public resetCombo(): void {
+    this.combo = 0;
   }
 }
