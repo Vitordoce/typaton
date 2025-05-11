@@ -11,7 +11,8 @@ import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes
  * Responsible for calculating and tracking scores
  */
 export class ScoreManager extends BaseManager {
-  update(time: number, delta: number): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  update(_time: number, _delta: number): void {
     // No update logic needed for ScoreManager
   }
   private totalScore: number = 0;
