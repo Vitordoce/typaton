@@ -401,12 +401,14 @@ export class PowerUpManager extends BaseManager {
    * Show an animation when the shield is hit but not destroyed
    */
   private showShieldHitAnimation(): void {
+    if (!this.shieldGraphics) return;
+    
     const { width, height } = this.scene.scale;
     const centerX = width / 2;
     const centerY = height - 40; // Same position as in GameScene
     
     // Create a flash effect
-    const flash = this.scene.add.circle(centerX, centerY, 50, 0x00ff00, 0.7);
+    const flash = this.scene.add.circle(centerX, centerY, 60, 0x00ff00, 0.7);
     this.scene.tweens.add({
       targets: flash,
       alpha: 0,
@@ -417,100 +419,123 @@ export class PowerUpManager extends BaseManager {
       }
     });
     
-    // Create particles for shield hit effect - fewer particles than break
-    if (this.scene.add && this.scene.add.particles) {
-      const particles = this.scene.add.particles(0, 0, 'particle', {
-        x: centerX,
-        y: centerY,
-        speed: { min: 50, max: 100 },
-        scale: { start: 0.3, end: 0 },
-        lifespan: 500,
-        blendMode: 'ADD',
-        tint: 0x00ff00, // Green color
-        quantity: 15,
-        emitting: false
-      });
-      
-      // Emit particles once
-      particles.explode(20, centerX, centerY);
-      
-      // Clean up particles after animation
-      this.scene.time.delayedCall(600, () => {
-        particles.destroy();
-      });
-    }
-    
-    // Make the shield pulse more intensely for a moment
+    // Add a brief pulse to the shield
     if (this.shieldGraphics) {
       this.scene.tweens.add({
         targets: this.shieldGraphics,
-        alpha: { from: 1, to: 0.7 },
         scale: { from: 1.2, to: 1 },
+        alpha: { from: 1, to: 0.8 },
         duration: 300,
         ease: 'Bounce.Out'
       });
     }
+    
+    // Show "IMPACTO BLOQUEADO" text
+    const hitText = this.scene.add.text(centerX, centerY - 80, 'IMPACTO BLOQUEADO', {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '14px',
+      color: '#00ff00',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Animate the hit text
+    this.scene.tweens.add({
+      targets: hitText,
+      alpha: { from: 0, to: 1 },
+      y: { from: centerY - 60, to: centerY - 90 },
+      duration: 400,
+      ease: 'Power2',
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: hitText,
+          alpha: 0,
+          delay: 300,
+          duration: 300,
+          onComplete: () => {
+            hitText.destroy();
+          }
+        });
+      }
+    });
   }
   
   /**
    * Show an animation when the shield breaks (when it expires or is hit)
    */
   private showShieldBreakAnimation(): void {
+    // Exit early if no shield graphics exist
+    if (!this.shieldGraphics) return;
+    
     const { width, height } = this.scene.scale;
     const centerX = width / 2;
     const centerY = height - 40; // Same position as in GameScene
     
-    // Create temporary graphics for the breaking effect
-    const breakGraphics = this.scene.add.graphics();
-    
-    // Draw multiple circles that will expand outward
-    for (let i = 0; i < 3; i++) {
-      breakGraphics.lineStyle(3 - i, 0x00ff00, 1 - (i * 0.2));
-      breakGraphics.strokeCircle(centerX, centerY, 50 + (i * 10));
+    // Stop any existing animation
+    if (this.shieldAnimation) {
+      this.shieldAnimation.stop();
+      this.shieldAnimation = null;
     }
     
-    // Add a flash effect
-    const flash = this.scene.add.circle(centerX, centerY, 60, 0x00ff00, 0.7);
+    // Safely get the shield info text before tweening
+    let shieldInfoText: Phaser.GameObjects.Text | undefined;
+    try {
+      // Cast with safe type checking
+      const shieldGraphicsWithInfo = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+        shieldInfoText?: Phaser.GameObjects.Text 
+      };
+      shieldInfoText = shieldGraphicsWithInfo.shieldInfoText;
+      
+      // Fade out the info text separately if it exists
+      if (shieldInfoText && shieldInfoText.active) {
+        this.scene.tweens.add({
+          targets: shieldInfoText,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => {
+            if (shieldInfoText && shieldInfoText.active) {
+              shieldInfoText.destroy();
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Error accessing shield info text:", e);
+    }
+    
+    // Clean up any attached particles immediately to avoid errors
+    try {
+      if (this.shieldGraphics && 'particles' in this.shieldGraphics) {
+        const graphicsWithParticles = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+          particles?: Phaser.GameObjects.Particles.ParticleEmitter 
+        };
+        if (graphicsWithParticles.particles) {
+          graphicsWithParticles.particles.destroy();
+          delete graphicsWithParticles.particles;
+        }
+      }
+    } catch (e) {
+      console.warn("Error cleaning up shield particles:", e);
+    }
+    
+    // Create a simple fade-out effect for the shield
     this.scene.tweens.add({
-      targets: flash,
+      targets: this.shieldGraphics,
       alpha: 0,
-      scale: 1.5,
-      duration: 300,
+      scale: 1.2,
+      duration: 500,
+      ease: 'Power2',
       onComplete: () => {
-        flash.destroy();
+        // Clean up the shield graphics
+        if (this.shieldGraphics && this.shieldGraphics.active) {
+          this.shieldGraphics.destroy();
+          this.shieldGraphics = null;
+        }
       }
     });
     
-    // Create particles for shield break effect
-    if (this.scene.add && this.scene.add.particles) {
-      try {
-        // First particle burst - outward explosion
-        const particles1 = this.scene.add.particles(0, 0, 'particle', {
-          x: centerX,
-          y: centerY,
-          speed: { min: 80, max: 200 },
-          scale: { start: 0.5, end: 0 },
-          lifespan: 800,
-          blendMode: 'ADD',
-          tint: 0x00ff00, // Green color
-          quantity: 30,
-          emitting: false
-        });
-        
-        // Emit particles once
-        particles1.explode(40, centerX, centerY);
-        
-        // Clean up particles after animation
-        this.scene.time.delayedCall(1000, () => {
-          particles1.destroy();
-        });
-      } catch (e) {
-        console.warn("Não foi possível criar partículas para a quebra do escudo", e);
-      }
-    }
-    
-    // Show "SHIELD BROKEN" text
-    const brokenText = this.scene.add.text(centerX, centerY - 80, 'PROTEÇÃO QUEBRADA', {
+    // Show "PROTEÇÃO REMOVIDA" text
+    const brokenText = this.scene.add.text(centerX, centerY - 80, 'PROTEÇÃO REMOVIDA', {
       fontFamily: '"Press Start 2P", cursive',
       fontSize: '18px',
       color: '#ff0000',
@@ -532,55 +557,15 @@ export class PowerUpManager extends BaseManager {
           delay: 600,
           duration: 500,
           onComplete: () => {
-            brokenText.destroy();
+            if (brokenText && brokenText.active) {
+              brokenText.destroy();
+            }
           }
         });
       }
     });
     
-    // Animate the shield breaking with a dramatic effect
-    this.scene.tweens.add({
-      targets: breakGraphics,
-      alpha: { from: 1, to: 0 },
-      scale: { from: 1, to: 1.5 },
-      duration: 700,
-      ease: 'Power2',
-      onComplete: () => {
-        breakGraphics.destroy();
-      }
-    });
-    
-    // Remove the active shield animation if it exists
-    if (this.shieldAnimation) {
-      this.shieldAnimation.stop();
-      this.shieldAnimation = null;
-    }
-    
-    // Remove the shield graphics and any attached text or particles
-    if (this.shieldGraphics) {
-      // Remove any shield info text
-      const shieldGraphicsWithInfo = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
-        shieldInfoText?: Phaser.GameObjects.Text 
-      };
-      
-      if (shieldGraphicsWithInfo.shieldInfoText) {
-        shieldGraphicsWithInfo.shieldInfoText.destroy();
-      }
-      
-      // Clean up any attached particles
-      if ('particles' in this.shieldGraphics) {
-        const graphicsWithParticles = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
-          particles: Phaser.GameObjects.Particles.ParticleEmitter 
-        };
-        if (graphicsWithParticles.particles) {
-          graphicsWithParticles.particles.destroy();
-        }
-      }
-      this.shieldGraphics.destroy();
-      this.shieldGraphics = null;
-    }
-    
-    // Remove the timer text
+    // Clean up timer text
     if (this.shieldTimerText) {
       this.shieldTimerText.destroy();
       this.shieldTimerText = null;
@@ -598,76 +583,107 @@ export class PowerUpManager extends BaseManager {
   /**
    * Update power-up timers and states
    * @param time - Current time
-   * @param delta - Time since last frame
    */
-  update(time: number, delta: number): void {
-    // Update active power-ups
-    for (const [type, isActive] of this.activePowerUps.entries()) {
-      if (!isActive) continue;
-      
-      // Check if power-up has expired
-      if (type === PowerUpType.FREEZE && time >= this.freezeTimer) {
-        this.activePowerUps.set(PowerUpType.FREEZE, false);
-      } else if (type === PowerUpType.SHIELD && time >= this.shieldEndTime) {
-        this.hasShield = false;
-        this.activePowerUps.set(PowerUpType.SHIELD, false);
-        this.showShieldBreakAnimation();
-      }
-      
-      // Update timer display
-      if (type === PowerUpType.FREEZE && this.freezeTimer > time) {
-        this.updatePowerUpIndicator(PowerUpType.FREEZE, (this.freezeTimer - time));
-      } else if (type === PowerUpType.SHIELD && this.shieldEndTime > time) {
-        this.updatePowerUpIndicator(PowerUpType.SHIELD, (this.shieldEndTime - time));
+  update(time: number): void {
+    try {
+      // Update active power-ups
+      for (const [type, isActive] of this.activePowerUps.entries()) {
+        if (!isActive) continue;
         
-        // Update shield timer text if it exists
-        if (this.shieldTimerText) {
-          const remainingSeconds = ((this.shieldEndTime - time) / 1000).toFixed(1);
-          this.shieldTimerText.setText(remainingSeconds);
+        // Check if power-up has expired
+        if (type === PowerUpType.FREEZE && time >= this.freezeTimer) {
+          this.activePowerUps.set(PowerUpType.FREEZE, false);
+        } else if (type === PowerUpType.SHIELD && time >= this.shieldEndTime) {
+          this.hasShield = false;
+          this.activePowerUps.set(PowerUpType.SHIELD, false);
+          this.showShieldBreakAnimation();
+        }
+        
+        // Update timer display
+        if (type === PowerUpType.FREEZE && this.freezeTimer > time) {
+          this.updatePowerUpIndicator(PowerUpType.FREEZE, (this.freezeTimer - time));
+        } else if (type === PowerUpType.SHIELD && this.shieldEndTime > time) {
+          this.updatePowerUpIndicator(PowerUpType.SHIELD, (this.shieldEndTime - time));
           
-          // Make the text pulse as time runs out
-          if ((this.shieldEndTime - time) < 500) {
-            this.shieldTimerText.setAlpha(Math.sin(time * 0.02) * 0.5 + 0.5);
+          // Update shield timer text if it exists
+          if (this.shieldTimerText && this.shieldTimerText.active) {
+            const remainingSeconds = ((this.shieldEndTime - time) / 1000).toFixed(1);
+            this.shieldTimerText.setText(remainingSeconds);
+            
+            // Make the text pulse as time runs out
+            if ((this.shieldEndTime - time) < 500) {
+              this.shieldTimerText.setAlpha(Math.sin(time * 0.02) * 0.5 + 0.5);
+            }
           }
         }
       }
+      
+      // Update shield graphics if needed
+      if (this.hasShield && !this.shieldGraphics) {
+        this.createShieldAnimation();
+      } else if (!this.hasShield && this.shieldGraphics) {
+        this.cleanupShieldResources();
+      }
+      
+      // Ensure shield has no rotation
+      if (this.shieldGraphics && this.shieldGraphics.active) {
+        // Reset rotation to keep shield fixed
+        this.shieldGraphics.rotation = 0;
+      }
+    } catch (e) {
+      console.warn("Error in PowerUpManager update:", e);
     }
-    
-    // Update shield graphics if needed
-    if (this.hasShield && !this.shieldGraphics) {
-      this.createShieldAnimation();
-    } else if (!this.hasShield && this.shieldGraphics) {
-      // If shield was used but graphics still exist, clean them up
+  }
+  
+  /**
+   * Helper method to clean up shield resources
+   */
+  private cleanupShieldResources(): void {
+    try {
+      // Stop animation if exists
       if (this.shieldAnimation) {
         this.shieldAnimation.stop();
         this.shieldAnimation = null;
       }
       
-      // Clean up any attached particles
-      if (this.shieldGraphics && 'particles' in this.shieldGraphics) {
-        const graphicsWithParticles = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
-          particles: Phaser.GameObjects.Particles.ParticleEmitter 
-        };
-        if (graphicsWithParticles.particles) {
-          graphicsWithParticles.particles.destroy();
+      // Clean up particles
+      if (this.shieldGraphics && this.shieldGraphics.active) {
+        try {
+          const graphicsWithInfo = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+            particles?: Phaser.GameObjects.Particles.ParticleEmitter;
+            shieldInfoText?: Phaser.GameObjects.Text;
+          };
+          
+          // Destroy particles
+          if (graphicsWithInfo.particles && graphicsWithInfo.particles.active) {
+            graphicsWithInfo.particles.destroy();
+          }
+          
+          // Destroy info text
+          if (graphicsWithInfo.shieldInfoText && graphicsWithInfo.shieldInfoText.active) {
+            graphicsWithInfo.shieldInfoText.destroy();
+          }
+        } catch (err) {
+          console.warn("Error cleaning shield attachments:", err);
         }
-      }
-      
-      if (this.shieldGraphics) {
+        
+        // Destroy graphics
         this.shieldGraphics.destroy();
         this.shieldGraphics = null;
       }
       
       // Clean up timer text
-      if (this.shieldTimerText) {
+      if (this.shieldTimerText && this.shieldTimerText.active) {
         this.shieldTimerText.destroy();
         this.shieldTimerText = null;
       }
-    }
-    
-    // Update shield graphics rotation if it exists (for continuous rotation effect)
-    if (this.shieldGraphics && !this.shieldAnimation) {
-      this.shieldGraphics.rotation += 0.01 * (delta / 16); // Smooth rotation based on frame rate
+    } catch (e) {
+      console.warn("Error cleaning up shield resources:", e);
+      
+      // Force nullify resources to prevent further errors
+      this.shieldAnimation = null;
+      this.shieldGraphics = null;
+      this.shieldTimerText = null;
     }
   }
   
@@ -769,16 +785,28 @@ export class PowerUpManager extends BaseManager {
     
     // Remove any existing shield graphics
     if (this.shieldGraphics) {
-      this.shieldGraphics.destroy();
+      try {
+        this.shieldGraphics.destroy();
+      } catch (e) {
+        console.warn("Error destroying existing shield:", e);
+      }
+      this.shieldGraphics = null;
     }
     
     // Remove any existing timer text
     if (this.shieldTimerText) {
       this.shieldTimerText.destroy();
+      this.shieldTimerText = null;
     }
     
     // Create a new graphics object for the shield
     this.shieldGraphics = this.scene.add.graphics();
+    
+    // Set the initial position and orientation
+    this.shieldGraphics.x = 0;
+    this.shieldGraphics.y = 0;
+    this.shieldGraphics.rotation = 0; // Ensure shield has no rotation
+    this.shieldGraphics.setScale(1);
     
     // Initial shield drawing - circular green shield
     this.shieldGraphics.clear();
@@ -805,36 +833,48 @@ export class PowerUpManager extends BaseManager {
     }
     
     // Adicionar texto indicando que o escudo protege um hit
-    const shieldInfoText = this.scene.add.text(centerX, centerY - 80, "PROTEGIDO", {
-      fontFamily: '"Press Start 2P", cursive',
-      fontSize: '16px',
-      color: '#00ff00',
-      stroke: '#000',
-      strokeThickness: 3
-    }).setOrigin(0.5);
+    let shieldInfoText: Phaser.GameObjects.Text | null = null;
+    try {
+      shieldInfoText = this.scene.add.text(centerX, centerY - 80, "PROTEGIDO", {
+        fontFamily: '"Press Start 2P", cursive',
+        fontSize: '16px',
+        color: '#00ff00',
+        stroke: '#000',
+        strokeThickness: 3
+      }).setOrigin(0.5);
+      
+      // Adicionar o texto de informação ao grupo do escudo para remover junto
+      (this.shieldGraphics as Phaser.GameObjects.Graphics & { 
+        shieldInfoText: Phaser.GameObjects.Text 
+      }).shieldInfoText = shieldInfoText;
+      
+      // Animar o texto de informação
+      this.scene.tweens.add({
+        targets: shieldInfoText,
+        alpha: { from: 1, to: 0.7 },
+        scale: { from: 1, to: 1.05 },
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
+      });
+    } catch (e) {
+      console.warn("Error adding shield info text:", e);
+    }
     
-    // Adicionar o texto de informação ao grupo do escudo para remover junto
-    const shieldGraphicsWithInfo = this.shieldGraphics as Phaser.GameObjects.Graphics & { 
-      shieldInfoText: Phaser.GameObjects.Text 
-    };
-    shieldGraphicsWithInfo.shieldInfoText = shieldInfoText;
-    
-    // Create a pulsing animation for the shield
-    this.shieldAnimation = this.scene.tweens.add({
-      targets: this.shieldGraphics,
-      alpha: { from: 0.95, to: 0.7 },
-      scale: { from: 1, to: 1.1 },
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        // Rotate the shield slightly on each update for a dynamic effect
-        if (this.shieldGraphics) {
-          this.shieldGraphics.rotation += 0.003;
-        }
-      }
-    });
+    // Create a subtle pulsing animation for the shield (no rotation)
+    try {
+      this.shieldAnimation = this.scene.tweens.add({
+        targets: this.shieldGraphics,
+        alpha: { from: 0.95, to: 0.8 },
+        scale: { from: 1, to: 1.05 },
+        duration: 1200,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    } catch (e) {
+      console.warn("Error creating shield animation:", e);
+    }
     
     // Add particle effect around the shield
     if (this.scene.add && this.scene.add.particles) {
@@ -860,20 +900,12 @@ export class PowerUpManager extends BaseManager {
       }
     }
     
-    // Animar também o texto de informação
-    this.scene.tweens.add({
-      targets: shieldInfoText,
-      alpha: { from: 1, to: 0.7 },
-      scale: { from: 1, to: 1.05 },
-      duration: 1000,
-      yoyo: true,
-      repeat: -1
-    });
-    
     // Make sure the shield is on top of other game elements
     if (this.scene.children && this.shieldGraphics) {
       this.scene.children.bringToTop(this.shieldGraphics);
-      this.scene.children.bringToTop(shieldInfoText);
+      if (shieldInfoText) {
+        this.scene.children.bringToTop(shieldInfoText);
+      }
     }
   }
   

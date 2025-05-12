@@ -38,30 +38,46 @@ export default class PhaserGame {
       this.game = new Phaser.Game(config);
       console.log('Phaser game created');
       
-      // Detectar e lidar com erros fatais
-      window.addEventListener('error', (e) => {
-        console.error('Erro fatal no jogo:', e);
-        if (this.game && this.game.scene) {
-          // Se houver um erro inesperado, tente reiniciar para a tela de título
+      // Improved error handling for fatal errors
+      window.addEventListener('error', (event) => {
+        // Avoid logging the entire error event object which might cause circular references
+        const errorInfo = {
+          message: event.message || 'Unknown error',
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error?.stack
+        };
+        
+        console.error('Game error detected:', errorInfo.message);
+        
+        // Only try to recover if we have a valid game instance
+        if (this.game && this.game.scene && !this.isDestroyed()) {
           try {
-            // Verificar se a cena de game over está ativa
-            const activeScene = this.game.scene.getScenes(true)[0];
-            if (activeScene && activeScene.scene.key !== 'GameOverScreen') {
-              this.game.scene.start('GameOverScreen', { 
-                scoreData: {
-                  totalScore: 0,
-                  wordCount: 0,
-                  averageTypingSpeed: 0,
-                  highestWordScore: 0,
-                  wordScores: [],
-                  levelScores: [],
-                  powerUpsUsed: 0,
-                  powerUpsCollected: 0
-                } 
-              });
+            // Check if any scenes are active before trying to transition
+            const activeScenes = this.game.scene.getScenes(true);
+            
+            if (activeScenes && activeScenes.length > 0) {
+              // Check if we're already in GameOverScreen or TitleScene to avoid loops
+              const currentSceneKey = activeScenes[0].scene.key;
+              
+              if (currentSceneKey !== 'GameOverScreen' && currentSceneKey !== 'TitleScene') {
+                console.log('Transitioning to GameOverScreen after error');
+                
+                // Use a delayed call to ensure scene transition happens after current frame
+                setTimeout(() => {
+                  if (this.game && this.game.scene && !this.isDestroyed()) {
+                    this.game.scene.start('TitleScene');
+                  }
+                }, 100);
+              } else {
+                console.log('Already in', currentSceneKey, '- not transitioning');
+              }
+            } else {
+              console.warn('No active scenes found');
             }
-          } catch (err) {
-            console.error('Erro ao tentar recuperar o jogo:', err);
+          } catch (recoveryError) {
+            console.error('Failed to recover from error:', recoveryError);
           }
         }
       });
@@ -69,10 +85,19 @@ export default class PhaserGame {
       console.error('Error creating Phaser game:', error);
     }
   }
+  
+  // Helper method to check if the game has been destroyed
+  private isDestroyed(): boolean {
+    return !this.game || !(this.game.isRunning || false);
+  }
 
   destroy() {
     if (this.game) {
-      this.game.destroy(true);
+      try {
+        this.game.destroy(true);
+      } catch (e) {
+        console.warn('Error during game destruction:', e);
+      }
       this.game = null;
     }
   }

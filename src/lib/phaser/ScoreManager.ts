@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
 import { GameEvents } from './types/GameEvents';
-import { WordData, WordType, WordEffect } from './types/WordData';
+import { WordType, WordEffect } from './types/WordData';
 import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes';
 
 // Score interfaces are now imported from './types/ScoreTypes'
