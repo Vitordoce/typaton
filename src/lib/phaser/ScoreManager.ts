@@ -145,8 +145,8 @@ export class ScoreManager extends BaseManager {
     this.typingStartTime = 0;
     this.currentTypingWord = '';
 
-    // Show floating score
-    this.showFloatingScore(wordData.position.x, wordData.position.y, wordScore);
+    // Remove the call to showFloatingScore as we're handling it in GameScene
+    // this.showFloatingScore(wordData.position.x, wordData.position.y, wordScore);
   }
   
   /**

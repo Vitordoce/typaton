@@ -806,6 +806,7 @@ export default class GameScene extends Phaser.Scene {
             }
           });
           
+          // Restore the original score display code (adding back what was previously removed)
           // Show floating score text
           const scoreText = this.add.text(textObj.x, textObj.y - 30, `+${wordScore}`, {
             fontFamily: '"Press Start 2P", cursive',
