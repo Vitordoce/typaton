@@ -1,4 +1,4 @@
-import { WordDifficulty, DifficultySettings, LevelDifficulty } from './types/WordDifficulty';
+import { WordDifficulty, DifficultySettings } from './types/WordDifficulty';
 
 export class DifficultyManager {
   private currentLevel: number = 1;
@@ -35,7 +35,7 @@ export class DifficultyManager {
         Math.floor(Math.random() * 3) + 3, // Length between 3-5 for level 1
         totalScore - 1
       );
-      const modifierScore = totalScore - speed - length;
+      // At this level, we use fixed values for modifiers rather than calculating from remaining points
       
       // For level 1, only allow one modifier at a time
       const hasModifier = Math.random() < 0.3; // 30% chance of having a modifier
@@ -78,11 +78,11 @@ export class DifficultyManager {
       );
     }
     
-    const modifierScore = remainingScore - length;
+    const remainingModifierPoints = remainingScore - length;
     
     // Distribute modifier points
-    const blinking = Math.floor(Math.random() * (modifierScore + 1));
-    const remainingModifierScore = modifierScore - blinking;
+    const blinking = Math.floor(Math.random() * (remainingModifierPoints + 1));
+    const remainingModifierScore = remainingModifierPoints - blinking;
     const shaking = Math.floor(Math.random() * (remainingModifierScore + 1));
     const flipped = remainingModifierScore - shaking;
 
