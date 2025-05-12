@@ -82,8 +82,8 @@ export default class GameScene extends Phaser.Scene {
       minDuration: 5,
       maxDuration: 10,
       wordsToClear: 10 + (this.level - 1) * 3,
-      minWordLength: Math.min(3 + Math.floor(this.level / 2), 6), // Increase word length with level
-      maxWordLength: Math.min(5 + Math.floor(this.level / 2), 8)  // Cap at reasonable length
+      minWordLength: 3, // Fixed minimum length of 3
+      maxWordLength: Math.min(4 + Math.floor(this.level / 2), 8)  // Start with max length of 4, increase with level
     };
   }
 
@@ -440,9 +440,9 @@ export default class GameScene extends Phaser.Scene {
     const difficulty = this.difficultyManager.generateWordDifficulty();
     
     // Calculate speed based on difficulty
-    const baseDuration = 10; // Base duration in seconds
-    const speedMultiplier = 1 + (difficulty.speed * 0.2); // 20% increase per speed point
-    const duration = baseDuration / speedMultiplier;
+    const baseDuration = 12; // Increased from 10 to 12 seconds for slower words
+    const speedMultiplier = 1 + (difficulty.speed * 0.08); // Reduced from 0.1 to 0.08 (8% increase per speed point)
+    const duration = Math.max(baseDuration / speedMultiplier, 6); // Increased minimum duration from 5 to 6 seconds
     
     const dx = centerX - spawnX;
     const dy = centerY - spawnY;
