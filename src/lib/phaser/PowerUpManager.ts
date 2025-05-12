@@ -32,7 +32,7 @@ export class PowerUpManager extends BaseManager {
   private shieldTimer: number = 0;
   private hasShield: boolean = false;
   private shieldEndTime: number = 0;
-  private powerUpChance: number = 0.25; // Aumentado para 25% de chance para cada palavra ser um power-up
+  private powerUpChance: number = 0.1;
   private collectedPowerUpsContainer: Phaser.GameObjects.Container | null = null;
   private shieldGraphics: Phaser.GameObjects.Graphics | null = null;
   private shieldAnimation: Phaser.Tweens.Tween | null = null;
