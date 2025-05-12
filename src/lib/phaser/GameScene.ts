@@ -7,6 +7,8 @@ import { GameOverScreen } from './GameOverScreen';
 import { GameEvents } from './types/GameEvents';
 import { WordType, WordEffect } from './types/WordData';
 import { generate } from 'random-words';
+import { DifficultyManager } from './DifficultyManager';
+import { WordDifficulty } from './types/WordDifficulty';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -34,6 +36,7 @@ interface WordObject {
   // Extensible: Add new bad condition properties here
   // Example: spinning?: boolean;
   // Example: colorShifting?: boolean;
+  difficulty: WordDifficulty;
 }
 
 export default class GameScene extends Phaser.Scene {
@@ -68,6 +71,7 @@ export default class GameScene extends Phaser.Scene {
   private isLevelTransitioning: boolean = false;
   private levelWords: string[] = []; // Store words for current level
   private usedWords: Set<string> = new Set(); // Track used words in current level
+  private difficultyManager: DifficultyManager = null!;
   
   // Method to trigger bomb effect (added in create)
   public triggerBombEffect: () => void;
@@ -251,6 +255,9 @@ export default class GameScene extends Phaser.Scene {
       graphics.generateTexture('particle', 16, 16);
       graphics.destroy();
     }
+
+    // Initialize difficulty manager
+    this.difficultyManager = new DifficultyManager();
   }
 
   /**
@@ -420,7 +427,6 @@ export default class GameScene extends Phaser.Scene {
 
   spawnWord(timestamp: number, centerX: number, centerY: number) {
     const { width, height } = this.scale;
-    const { minDuration, maxDuration } = this.getLevelSettings();
     const angleDeg = Phaser.Math.Between(30, 150);
     const angleRad = Phaser.Math.DegToRad(angleDeg);
     const diagonal = Math.sqrt(width * width + height * height);
@@ -429,35 +435,41 @@ export default class GameScene extends Phaser.Scene {
     let spawnY = centerY - Math.sin(angleRad) * spawnRadius;
     spawnX = Phaser.Math.Clamp(spawnX, -200, width + 200);
     spawnY = Phaser.Math.Clamp(spawnY, -200, height + 200);
-    const duration = Phaser.Math.FloatBetween(minDuration, maxDuration);
+
+    // Generate word difficulty
+    const difficulty = this.difficultyManager.generateWordDifficulty();
+    
+    // Calculate speed based on difficulty
+    const baseDuration = 10; // Base duration in seconds
+    const speedMultiplier = 1 + (difficulty.speed * 0.2); // 20% increase per speed point
+    const duration = baseDuration / speedMultiplier;
+    
     const dx = centerX - spawnX;
     const dy = centerY - spawnY;
     const vx = dx / duration;
     const vy = dy / duration;
     
-    // Determine if this should be a power-up word
+    // Get a word with appropriate length
     let wordValue;
-    let isPowerUp = false;
-    let powerUpType = null;
-    
-    // 10% chance for any word to be a power-up
-    if (Math.random() < 0.1) {
-      isPowerUp = true;
-      powerUpType = this.powerUpManager.getRandomPowerUpType();
-    }
-    
-    // Get a random unused word from the level words
-    let availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+    let availableWords = this.levelWords.filter(word => 
+      !this.usedWords.has(word) && 
+      word.length >= difficulty.length && 
+      word.length <= difficulty.length + 2
+    );
     
     // If we're running low on available words, generate more
     if (availableWords.length < 5) {
       const newWords = generate({
         exactly: 20,
-        minLength: this.getLevelSettings().minWordLength,
-        maxLength: this.getLevelSettings().maxWordLength
+        minLength: difficulty.length,
+        maxLength: difficulty.length + 2
       }) as string[];
       this.levelWords.push(...newWords);
-      availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+      availableWords = this.levelWords.filter(word => 
+        !this.usedWords.has(word) && 
+        word.length >= difficulty.length && 
+        word.length <= difficulty.length + 2
+      );
     }
     
     // Select a random word from available words
@@ -466,16 +478,10 @@ export default class GameScene extends Phaser.Scene {
     // Mark the word as used
     this.usedWords.add(wordValue);
     
-    // Make sure we have a valid word value
     const displayText = wordValue || 'error';
     const wordText = this.add.text(spawnX, spawnY, displayText, {
       ...this.arcadeFontStyle
     }).setOrigin(0.5);
-    
-    // Apply power-up effect if needed
-    if (isPowerUp && powerUpType) {
-      this.powerUpManager.applyPowerUpEffect(wordText, powerUpType);
-    }
 
     // Create word object with base properties
     const currentTime = this.time ? this.time.now : Date.now();
@@ -497,17 +503,38 @@ export default class GameScene extends Phaser.Scene {
       flipAngle: 0,
       shakeOffset: { x: 0, y: 0 },
       shakeRot: 0,
-      isPowerUp: isPowerUp,
-      powerUpType: powerUpType
+      isPowerUp: false,
+      powerUpType: null,
+      difficulty // Store the difficulty for scoring
     };
 
-    // Apply bad conditions based on level (only for non-power-up words)
-    if (!isPowerUp) {
-      this.setupBadConditions(wordObj);
-    }
+    // Apply modifiers based on difficulty
+    this.applyWordModifiers(wordObj, difficulty);
 
     // Add to words array
     this.words.push(wordObj);
+  }
+
+  // New method to apply modifiers based on difficulty
+  private applyWordModifiers(wordObj: WordObject, difficulty: WordDifficulty) {
+    // Apply blinking if difficulty.modifiers.blinking > 0
+    if (difficulty.modifiers.blinking > 0) {
+      wordObj.blinking = true;
+      wordObj.blinkTimer = 0;
+    }
+    
+    // Apply shaking if difficulty.modifiers.shaking > 0
+    if (difficulty.modifiers.shaking > 0) {
+      wordObj.shaking = true;
+    }
+    
+    // Apply flipping if difficulty.modifiers.flipped > 0
+    if (difficulty.modifiers.flipped > 0) {
+      wordObj.flipped = true;
+      wordObj.flipAngle = Math.PI;
+      wordObj.text.rotation = wordObj.flipAngle;
+      wordObj.text.setTint(0xffe600);
+    }
   }
 
   /**
@@ -777,11 +804,6 @@ export default class GameScene extends Phaser.Scene {
             this.scoreText.setText(`SCORE: ${this.score}`);
           }
           
-          // Update score display
-          if (this.scoreText) {
-            this.scoreText.setText(`SCORE: ${this.score}`);
-          }
-          
           if (this.wordsCleared >= this.getLevelSettings().wordsToClear) {
             this.levelComplete();
           }
@@ -867,6 +889,9 @@ export default class GameScene extends Phaser.Scene {
         this.levelText.setText(`LEVEL: ${this.level} / ${this.maxLevel}`);
       }
       
+      // Increase difficulty level
+      this.difficultyManager.increaseLevel();
+      
       // Generate new words for the next level
       this.generateLevelWords();
       
@@ -881,10 +906,6 @@ export default class GameScene extends Phaser.Scene {
       
       // Increase WordManager difficulty
       this.wordManager.increaseLevel();
-      
-      // Power-ups are automatically preserved since they're stored in PowerUpManager
-    } else {
-      // Campaign complete, handled in levelComplete
     }
   }
   
