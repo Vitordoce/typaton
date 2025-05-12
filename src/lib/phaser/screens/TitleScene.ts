@@ -44,7 +44,7 @@ export class TitleScene extends Phaser.Scene {
       padding: { x: 20, y: 10 }
     }).setOrigin(0.5)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('GameScene'))
+      .on('pointerdown', () => this.startGame())
       .on('pointerover', () => startButton.setTint(0x66ff66))
       .on('pointerout', () => startButton.clearTint());
     
@@ -74,8 +74,41 @@ export class TitleScene extends Phaser.Scene {
       }).setOrigin(0.5);
     });
 
+    // Add "Press ENTER to start" text
+    const enterText = this.add.text(width/2, height * 0.85, 'PRESS ENTER TO START', {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '22px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 3
+    }).setOrigin(0.5);
+    
+    // Add blinking animation to the ENTER text
+    this.tweens.add({
+      targets: enterText,
+      alpha: { from: 1, to: 0.3 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Set up keyboard input for Enter key
+    this.input.keyboard?.on('keydown-ENTER', () => {
+      this.startGame();
+    });
+
     // Add animation of falling words to show the game concept
     this.createFallingWords();
+  }
+  
+  // Method to start the game
+  private startGame() {
+    // Add a brief flash effect before starting
+    this.cameras.main.flash(500, 255, 255, 255, true, (camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+      if (progress === 1) {
+        this.scene.start('GameScene');
+      }
+    });
   }
 
   /**

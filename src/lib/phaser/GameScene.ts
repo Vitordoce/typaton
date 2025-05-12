@@ -266,7 +266,14 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (this.gameOver || this.campaignComplete) return;
+    // Se o jogo já acabou ou está completo, não faz nada
+    if (this.gameOver || this.campaignComplete) {
+      // Garantir que a tela de game over seja exibida se o jogo acabou
+      if (this.gameOver && !this.isShowingGameOverScreen) {
+        this.showGameOverScreen();
+      }
+      return;
+    }
     
     const { width, height } = this.scale;
     const centerX = width / 2;
@@ -285,6 +292,22 @@ export default class GameScene extends Phaser.Scene {
     if (this.isActivePlaying() && !isFreezeActive && this.words.length < 3 && (currentTime - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(currentTime, centerX, centerY);
       this.lastSpawnTime = currentTime;
+    }
+
+    // Verificação adicional: se não há palavras e o jogo está em andamento
+    // mas não conseguimos criar novas palavras, isso pode ser um erro
+    if (this.isActivePlaying() && this.words.length === 0 && (currentTime - this.lastSpawnTime > 3000)) {
+      // Tentar gerar palavras novamente
+      this.spawnWord(currentTime, centerX, centerY);
+      this.lastSpawnTime = currentTime;
+      
+      // Se mesmo assim não tiver palavras, algo está errado
+      if (this.words.length === 0) {
+        console.error("Não foi possível gerar palavras. Reiniciando o jogo.");
+        this.gameOver = true;
+        this.showGameOverScreen();
+        return;
+      }
     }
 
     for (let i = this.words.length - 1; i >= 0; i--) {
@@ -307,7 +330,10 @@ export default class GameScene extends Phaser.Scene {
       if (this.isActivePlaying()) {
         const dx = wordObj.text.x - centerX;
         const dy = wordObj.text.y - centerY;
-        if (Math.sqrt(dx*dx + dy*dy) < 30) {
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        
+        // Aumentar um pouco a zona de colisão para detectar melhor
+        if (distance < 35) {
           // Check if shield is active
           if (this.powerUpManager && this.powerUpManager.hasActiveShield()) {
             // Use shield to block the hit but don't consume it (it's now indestructible for 2 seconds)
@@ -321,8 +347,10 @@ export default class GameScene extends Phaser.Scene {
             
             // Show enhanced game over screen with score data
             this.showGameOverScreen();
+            
+            // Break para não processar mais palavras
+            break;
           }
-          break;
         }
       }
     }
@@ -447,7 +475,6 @@ export default class GameScene extends Phaser.Scene {
     const vy = dy / duration;
     
     // Get a word with appropriate length
-    let wordValue;
     let availableWords = this.levelWords.filter(word => 
       !this.usedWords.has(word) && 
       word.length >= difficulty.length && 
@@ -470,7 +497,8 @@ export default class GameScene extends Phaser.Scene {
     }
     
     // Select a random word from available words
-    const wordValue = availableWords[Math.floor(Math.random() * availableWords.length)];
+    const randomIndex = Math.floor(Math.random() * availableWords.length);
+    const wordValue = availableWords[randomIndex];
     
     // Mark the word as used
     this.usedWords.add(wordValue);
@@ -482,7 +510,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Create word object with base properties
     const currentTime = this.time ? this.time.now : Date.now();
-    const wordObj = {
+    const wordObj: WordObject = {
       text: wordText,
       value: displayText,
       vx,
@@ -504,6 +532,22 @@ export default class GameScene extends Phaser.Scene {
       powerUpType: null,
       difficulty // Store the difficulty for scoring
     };
+
+    // Verificar se esta palavra deve ser um power-up
+    // Aumentando a chance para garantir que apareçam mais power-ups
+    if (this.powerUpManager && this.powerUpManager.shouldBePowerUp()) {
+      // Definir o tipo de poder aleatoriamente
+      const powerUpType = this.powerUpManager.getRandomPowerUpType();
+      
+      // Marcar o objeto como um power-up
+      wordObj.isPowerUp = true;
+      wordObj.powerUpType = powerUpType as (PowerUpType | null);
+      
+      // Aplicar efeito visual no texto para indicar que é um power-up
+      this.powerUpManager.applyPowerUpEffect(wordText, powerUpType);
+      
+      console.log(`Spawned power-up word: ${displayText} (${powerUpType})`);
+    }
 
     // Apply modifiers based on difficulty
     this.applyWordModifiers(wordObj, difficulty);
@@ -1077,7 +1121,10 @@ export default class GameScene extends Phaser.Scene {
   private showGameOverScreen(): void {
     // Avoid showing multiple times
     if (this.isShowingGameOverScreen) return;
+    
+    // Marcar que a tela de game over está sendo mostrada
     this.isShowingGameOverScreen = true;
+    console.log("Exibindo tela de game over");
     
     // Clear input text to avoid issues when restarting
     this.inputText = '';
@@ -1085,10 +1132,21 @@ export default class GameScene extends Phaser.Scene {
       this.inputDisplay.setText('');
     }
     
+    // Remover palavras da tela para limpar visualmente
+    for (const word of this.words) {
+      if (word.text) {
+        word.text.destroy();
+      }
+    }
+    this.words = [];
+    
     // Get score data from score manager
     const scoreData = this.scoreManager.getScoreData();
     
-    // Transition to the GameOverScreen scene with score data
-    this.scene.start('GameOverScreen', { scoreData });
+    // Adicionar um pequeno atraso para garantir que transição ocorra corretamente
+    this.time.delayedCall(100, () => {
+      // Transition to the GameOverScreen scene with score data
+      this.scene.start('GameOverScreen', { scoreData });
+    });
   }
 }

@@ -27,6 +27,7 @@ export class GameOverScreen extends Phaser.Scene {
     if (data && data.scoreData) {
       this.scoreData = data.scoreData;
     }
+    console.log("GameOverScreen iniciada com score:", this.scoreData.totalScore);
   }
   
   create() {
@@ -131,8 +132,7 @@ export class GameOverScreen extends Phaser.Scene {
     });
     
     playAgainButton.on('pointerdown', () => {
-      // Return to title screen
-      this.scene.start('TitleScene');
+      this.restartGame();
     });
     
     // Add button animation
@@ -145,27 +145,46 @@ export class GameOverScreen extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
     
-    // Add keyboard handling for restart
-    this.input.keyboard?.once('keydown-ENTER', () => {
-      this.scene.start('TitleScene');
+    // Add keyboard handling para ENTER e ESPAÇO
+    this.input.keyboard?.on('keydown-ENTER', () => {
+      this.restartGame();
     });
     
-    // Add instruction text
-    const instructionText = this.add.text(width/2, height * 0.85, 'PRESS ENTER OR CLICK BUTTON', {
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      this.restartGame();
+    });
+    
+    // Add instruction text com mais destaque
+    const instructionText = this.add.text(width/2, height * 0.85, 'PRESS ENTER OR SPACE TO RESTART', {
       fontFamily: '"Press Start 2P", cursive',
-      fontSize: '12px',
-      color: '#aaaaaa'
+      fontSize: '16px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 2
     }).setOrigin(0.5);
     
     this.gameElements.push(instructionText);
     
-    // Make instruction text blink
+    // Make instruction text blink mais visível
     this.tweens.add({
       targets: instructionText,
-      alpha: { from: 1, to: 0.3 },
-      duration: 800,
+      alpha: { from: 1, to: 0.4 },
+      scale: { from: 1, to: 1.05 },
+      duration: 600,
       yoyo: true,
       repeat: -1
+    });
+  }
+  
+  // Método para reiniciar o jogo com efeitos
+  private restartGame(): void {
+    // Adicionar efeito de flash na transição
+    this.cameras.main.flash(500, 255, 0, 0, false, (camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+      if (progress === 1) {
+        // Garantir que todos os event listeners sejam removidos
+        this.input.keyboard?.removeAllListeners();
+        this.scene.start('TitleScene');
+      }
     });
   }
 } 
