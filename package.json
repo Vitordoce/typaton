@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "vercel-build": "npm install && next build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "vercel-build": "next build",
     "lint": "next lint",
     "postinstall": "[ -f node_modules/next/dist/compiled/regenerator-runtime/runtime.js ] || npm install"
   },
