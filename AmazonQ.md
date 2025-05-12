@@ -3,8 +3,8 @@
 ## Overview
 I've implemented a power-up system for the Typaton typing game. This system adds special words that appear with rainbow blinking effects. When typed correctly, these words grant the player one of four power-ups:
 
+
 1. **Freeze** - Stops all words for 3 seconds
-2. **Slow** - Reduces word speed by 50% for 5 seconds
 3. **Bomb** - Destroys all words on screen
 4. **Shield** - Provides protection from one hit
 
