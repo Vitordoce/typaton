@@ -282,7 +282,7 @@ export default class GameScene extends Phaser.Scene {
 
     // Update power-up manager
     if (this.powerUpManager) {
-      this.powerUpManager.update(time, delta);
+      this.powerUpManager.update(time);
     }
     
     // Check if freeze is active

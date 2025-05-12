@@ -140,12 +140,14 @@ export class Word extends Phaser.GameObjects.Container {
           this.textObject.rotation = this.flipAngle;
           this.textObject.setTint(0xffe600);
           break;
+        /* These types are not in the WordEffect interface
         case 'fading':
           this.textObject.setAlpha(0.5);
           break;
         case 'rotating':
           // Rotation is handled in update
           break;
+        */
       }
     }
   }
@@ -186,9 +188,11 @@ export class Word extends Phaser.GameObjects.Container {
         case 'shaking':
           this.updateShakingEffect();
           break;
+        /* Rotating is not in the WordEffect interface
         case 'rotating':
           this.updateRotatingEffect(delta, effect.intensity || 1);
           break;
+        */
       }
     }
   }
@@ -215,15 +219,6 @@ export class Word extends Phaser.GameObjects.Container {
     
     this.shakeOffset = { x: shakeX, y: shakeY };
     this.textObject.rotation = (this.flipAngle) + shakeRot;
-  }
-  
-  /**
-   * Update rotating effect
-   * @param delta - Time since last frame in ms
-   * @param intensity - Rotation intensity
-   */
-  private updateRotatingEffect(delta: number, intensity: number): void {
-    this.textObject.rotation += (delta / 1000) * intensity;
   }
   
   /**

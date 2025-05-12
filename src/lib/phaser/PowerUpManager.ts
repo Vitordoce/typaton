@@ -835,7 +835,7 @@ export class PowerUpManager extends BaseManager {
     // Adicionar texto indicando que o escudo protege um hit
     let shieldInfoText: Phaser.GameObjects.Text | null = null;
     try {
-      shieldInfoText = this.scene.add.text(centerX, centerY - 80, "PROTEGIDO", {
+      shieldInfoText = this.scene.add.text(centerX, centerY - 80, "Protected", {
         fontFamily: '"Press Start 2P", cursive',
         fontSize: '16px',
         color: '#00ff00',

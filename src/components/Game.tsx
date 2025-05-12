@@ -86,13 +86,13 @@ export default function Game() {
         <p className="arcade-text mb-2 text-sm text-white">Type the falling words before they reach the bottom!</p>
         <p className="arcade-text text-xs text-white">Just type the word - no need to press Enter.</p>
         <p className="arcade-text mt-2 text-yellow-300 text-xs">Game Over if any word reaches the center!</p>
+        <p className="arcade-text mt-2 text-yellow-300 text-xs">The input erase on Enter</p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div className="text-left">
             <h3 className="arcade-text text-sm text-green-400 mb-1">Power-Ups</h3>
             <ul className="text-xs text-white space-y-1 pl-4">
               <li className="arcade-text"><span className="text-cyan-400">freeze</span> - Stops all words</li>
-              <li className="arcade-text"><span className="text-green-400">slow</span> - Reduces word speed</li>
               <li className="arcade-text"><span className="text-red-400">bomb</span> - Destroys all words</li>
               <li className="arcade-text"><span className="text-yellow-400">shield</span> - Blocks one hit</li>
             </ul>
