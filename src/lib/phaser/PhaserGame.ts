@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import GameScene from './GameScene';
+import { TitleScene, WinScene, GameOverScreen } from './screens';
 
 export default class PhaserGame {
   game: Phaser.Game | null = null;
@@ -8,14 +9,14 @@ export default class PhaserGame {
     try {
       console.log('Initializing Phaser game...');
       
-      // Super simple configuration
+      // Game configuration with all scenes, starting with TitleScene
       const config = {
         type: Phaser.AUTO,
         width: width,
         height: height,
         parent: containerId,
         backgroundColor: '#2d2d2d',
-        scene: GameScene
+        scene: [TitleScene, GameScene, WinScene, GameOverScreen]
       };
 
       // Create the game instance

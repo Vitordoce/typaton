@@ -230,7 +230,7 @@ export class PowerUpManager extends BaseManager {
     const now = this.scene.time.now;
     
     // Check if we have this power-up available
-    if (this.collectedPowerUps.get(powerUpType) <= 0) {
+    if ((this.collectedPowerUps.get(powerUpType) || 0) <= 0) {
       // Don't activate if we don't have any
       return false;
     }
