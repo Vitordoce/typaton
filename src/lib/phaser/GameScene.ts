@@ -3,10 +3,11 @@ import { WordManager } from './WordManager';
 import { PowerUpManager } from './PowerUpManager';
 import { PowerUpType } from './types/PowerUpTypes';
 import { ScoreManager } from './ScoreManager';
-import { GameOverScreen } from './GameOverScreen';
 import { GameEvents } from './types/GameEvents';
 import { WordType, WordEffect } from './types/WordData';
 import { generate } from 'random-words';
+import { DifficultyManager } from './DifficultyManager';
+import { WordDifficulty } from './types/WordDifficulty';
 
 // Define a proper type for word objects 
 interface WordObject {
@@ -34,6 +35,7 @@ interface WordObject {
   // Extensible: Add new bad condition properties here
   // Example: spinning?: boolean;
   // Example: colorShifting?: boolean;
+  difficulty: WordDifficulty;
 }
 
 export default class GameScene extends Phaser.Scene {
@@ -53,7 +55,6 @@ export default class GameScene extends Phaser.Scene {
   private wordManager: WordManager = null!;
   private powerUpManager: PowerUpManager = null!;
   private scoreManager: ScoreManager = null!;
-  private gameOverScreen: GameOverScreen = null!;
   private arcadeFontStyle = {
     fontFamily: '"Press Start 2P", cursive',
     fontSize: '24px', // larger for falling words
@@ -68,6 +69,7 @@ export default class GameScene extends Phaser.Scene {
   private isLevelTransitioning: boolean = false;
   private levelWords: string[] = []; // Store words for current level
   private usedWords: Set<string> = new Set(); // Track used words in current level
+  private difficultyManager: DifficultyManager = null!;
   
   // Method to trigger bomb effect (added in create)
   public triggerBombEffect: () => void;
@@ -78,8 +80,8 @@ export default class GameScene extends Phaser.Scene {
       minDuration: 5,
       maxDuration: 10,
       wordsToClear: 10 + (this.level - 1) * 3,
-      minWordLength: Math.min(3 + Math.floor(this.level / 2), 6), // Increase word length with level
-      maxWordLength: Math.min(5 + Math.floor(this.level / 2), 8)  // Cap at reasonable length
+      minWordLength: 3, // Fixed minimum length of 3
+      maxWordLength: Math.min(4 + Math.floor(this.level / 2), 8)  // Start with max length of 4, increase with level
     };
   }
 
@@ -119,7 +121,6 @@ export default class GameScene extends Phaser.Scene {
     this.wordManager = new WordManager(this);
     this.powerUpManager = new PowerUpManager(this);
     this.scoreManager = new ScoreManager(this);
-    this.gameOverScreen = new GameOverScreen(this);
     
     const { width, height } = this.scale;
     this.level = 1;
@@ -251,6 +252,9 @@ export default class GameScene extends Phaser.Scene {
       graphics.generateTexture('particle', 16, 16);
       graphics.destroy();
     }
+
+    // Initialize difficulty manager
+    this.difficultyManager = new DifficultyManager();
   }
 
   /**
@@ -262,7 +266,14 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number) {
-    if (this.gameOver || this.campaignComplete) return;
+    // Se o jogo já acabou ou está completo, não faz nada
+    if (this.gameOver || this.campaignComplete) {
+      // Garantir que a tela de game over seja exibida se o jogo acabou
+      if (this.gameOver && !this.isShowingGameOverScreen) {
+        this.showGameOverScreen();
+      }
+      return;
+    }
     
     const { width, height } = this.scale;
     const centerX = width / 2;
@@ -281,6 +292,22 @@ export default class GameScene extends Phaser.Scene {
     if (this.isActivePlaying() && !isFreezeActive && this.words.length < 3 && (currentTime - this.lastSpawnTime > 500 || this.words.length === 0)) {
       this.spawnWord(currentTime, centerX, centerY);
       this.lastSpawnTime = currentTime;
+    }
+
+    // Verificação adicional: se não há palavras e o jogo está em andamento
+    // mas não conseguimos criar novas palavras, isso pode ser um erro
+    if (this.isActivePlaying() && this.words.length === 0 && (currentTime - this.lastSpawnTime > 3000)) {
+      // Tentar gerar palavras novamente
+      this.spawnWord(currentTime, centerX, centerY);
+      this.lastSpawnTime = currentTime;
+      
+      // Se mesmo assim não tiver palavras, algo está errado
+      if (this.words.length === 0) {
+        console.error("Não foi possível gerar palavras. Reiniciando o jogo.");
+        this.gameOver = true;
+        this.showGameOverScreen();
+        return;
+      }
     }
 
     for (let i = this.words.length - 1; i >= 0; i--) {
@@ -303,7 +330,10 @@ export default class GameScene extends Phaser.Scene {
       if (this.isActivePlaying()) {
         const dx = wordObj.text.x - centerX;
         const dy = wordObj.text.y - centerY;
-        if (Math.sqrt(dx*dx + dy*dy) < 30) {
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        
+        // Aumentar um pouco a zona de colisão para detectar melhor
+        if (distance < 35) {
           // Check if shield is active
           if (this.powerUpManager && this.powerUpManager.hasActiveShield()) {
             // Use shield to block the hit but don't consume it (it's now indestructible for 2 seconds)
@@ -317,8 +347,10 @@ export default class GameScene extends Phaser.Scene {
             
             // Show enhanced game over screen with score data
             this.showGameOverScreen();
+            
+            // Break para não processar mais palavras
+            break;
           }
-          break;
         }
       }
     }
@@ -420,7 +452,6 @@ export default class GameScene extends Phaser.Scene {
 
   spawnWord(timestamp: number, centerX: number, centerY: number) {
     const { width, height } = this.scale;
-    const { minDuration, maxDuration } = this.getLevelSettings();
     const angleDeg = Phaser.Math.Between(30, 150);
     const angleRad = Phaser.Math.DegToRad(angleDeg);
     const diagonal = Math.sqrt(width * width + height * height);
@@ -429,57 +460,57 @@ export default class GameScene extends Phaser.Scene {
     let spawnY = centerY - Math.sin(angleRad) * spawnRadius;
     spawnX = Phaser.Math.Clamp(spawnX, -200, width + 200);
     spawnY = Phaser.Math.Clamp(spawnY, -200, height + 200);
-    const duration = Phaser.Math.FloatBetween(minDuration, maxDuration);
+
+    // Generate word difficulty
+    const difficulty = this.difficultyManager.generateWordDifficulty();
+    
+    // Calculate speed based on difficulty
+    const baseDuration = 12; // Increased from 10 to 12 seconds for slower words
+    const speedMultiplier = 1 + (difficulty.speed * 0.08); // Reduced from 0.1 to 0.08 (8% increase per speed point)
+    const duration = Math.max(baseDuration / speedMultiplier, 6); // Increased minimum duration from 5 to 6 seconds
+    
     const dx = centerX - spawnX;
     const dy = centerY - spawnY;
     const vx = dx / duration;
     const vy = dy / duration;
     
-    // Determine if this should be a power-up word
-    let wordValue;
-    let isPowerUp = false;
-    let powerUpType = null;
-    
-    // 10% chance for any word to be a power-up
-    if (Math.random() < 0.1) {
-      isPowerUp = true;
-      powerUpType = this.powerUpManager.getRandomPowerUpType();
-    }
-    
-    // Get a random unused word from the level words
-    let availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+    // Get a word with appropriate length
+    let availableWords = this.levelWords.filter(word => 
+      !this.usedWords.has(word) && 
+      word.length >= difficulty.length && 
+      word.length <= difficulty.length + 2
+    );
     
     // If we're running low on available words, generate more
     if (availableWords.length < 5) {
       const newWords = generate({
         exactly: 20,
-        minLength: this.getLevelSettings().minWordLength,
-        maxLength: this.getLevelSettings().maxWordLength
+        minLength: difficulty.length,
+        maxLength: difficulty.length + 2
       }) as string[];
       this.levelWords.push(...newWords);
-      availableWords = this.levelWords.filter(word => !this.usedWords.has(word));
+      availableWords = this.levelWords.filter(word => 
+        !this.usedWords.has(word) && 
+        word.length >= difficulty.length && 
+        word.length <= difficulty.length + 2
+      );
     }
     
     // Select a random word from available words
-    wordValue = availableWords[Math.floor(Math.random() * availableWords.length)];
+    const randomIndex = Math.floor(Math.random() * availableWords.length);
+    const wordValue = availableWords[randomIndex];
     
     // Mark the word as used
     this.usedWords.add(wordValue);
     
-    // Make sure we have a valid word value
     const displayText = wordValue || 'error';
     const wordText = this.add.text(spawnX, spawnY, displayText, {
       ...this.arcadeFontStyle
     }).setOrigin(0.5);
-    
-    // Apply power-up effect if needed
-    if (isPowerUp && powerUpType) {
-      this.powerUpManager.applyPowerUpEffect(wordText, powerUpType);
-    }
 
     // Create word object with base properties
     const currentTime = this.time ? this.time.now : Date.now();
-    const wordObj = {
+    const wordObj: WordObject = {
       text: wordText,
       value: displayText,
       vx,
@@ -497,17 +528,54 @@ export default class GameScene extends Phaser.Scene {
       flipAngle: 0,
       shakeOffset: { x: 0, y: 0 },
       shakeRot: 0,
-      isPowerUp: isPowerUp,
-      powerUpType: powerUpType
+      isPowerUp: false,
+      powerUpType: null,
+      difficulty // Store the difficulty for scoring
     };
 
-    // Apply bad conditions based on level (only for non-power-up words)
-    if (!isPowerUp) {
-      this.setupBadConditions(wordObj);
+    // Verificar se esta palavra deve ser um power-up
+    // Aumentando a chance para garantir que apareçam mais power-ups
+    if (this.powerUpManager && this.powerUpManager.shouldBePowerUp()) {
+      // Definir o tipo de poder aleatoriamente
+      const powerUpType = this.powerUpManager.getRandomPowerUpType();
+      
+      // Marcar o objeto como um power-up
+      wordObj.isPowerUp = true;
+      wordObj.powerUpType = powerUpType as (PowerUpType | null);
+      
+      // Aplicar efeito visual no texto para indicar que é um power-up
+      this.powerUpManager.applyPowerUpEffect(wordText, powerUpType);
+      
+      console.log(`Spawned power-up word: ${displayText} (${powerUpType})`);
     }
+
+    // Apply modifiers based on difficulty
+    this.applyWordModifiers(wordObj, difficulty);
 
     // Add to words array
     this.words.push(wordObj);
+  }
+
+  // New method to apply modifiers based on difficulty
+  private applyWordModifiers(wordObj: WordObject, difficulty: WordDifficulty) {
+    // Apply blinking if difficulty.modifiers.blinking > 0
+    if (difficulty.modifiers.blinking > 0) {
+      wordObj.blinking = true;
+      wordObj.blinkTimer = 0;
+    }
+    
+    // Apply shaking if difficulty.modifiers.shaking > 0
+    if (difficulty.modifiers.shaking > 0) {
+      wordObj.shaking = true;
+    }
+    
+    // Apply flipping if difficulty.modifiers.flipped > 0
+    if (difficulty.modifiers.flipped > 0) {
+      wordObj.flipped = true;
+      wordObj.flipAngle = Math.PI;
+      wordObj.text.rotation = wordObj.flipAngle;
+      wordObj.text.setTint(0xffe600);
+    }
   }
 
   /**
@@ -553,34 +621,44 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handleKeyPress = (event: KeyboardEvent) => {
-    if (this.gameOver || this.campaignComplete) return;
+    // Ignorar entradas durante transições de nível ou se o jogo acabou
+    if (this.gameOver || this.campaignComplete || this.isLevelTransitioning) return;
     
-    // If game over screen is showing, handle restart
-    if (this.gameOverScreen.isShowing()) {
+    // If game over is active, handle restart with Enter key
+    if (this.isShowingGameOverScreen) {
       if (event.key === 'Enter' || event.key === ' ') {
-        this.scene.restart();
+        this.scene.start('TitleScene');
         return;
       }
     }
     
-    // Handle backspace
+    // Pressionar Enter limpa a entrada atual (útil para pular palavras difíceis)
+    if (event.key === 'Enter') {
+      this.inputText = '';
+      if (this.inputDisplay) {
+        this.inputDisplay.setText('');
+      }
+      return;
+    }
+    
+    // Lidar com backspace
     if (event.key === 'Backspace') {
       this.inputText = this.inputText.slice(0, -1);
     }
-    // Ignore spacebar
+    // Ignorar espaço
     else if (event.key === ' ' || event.key === 'Space') {
-      // Do nothing - ignore spaces
+      // Não fazer nada - ignorar espaços
       return;
     }
-    // Add character to input
+    // Adicionar caractere à entrada
     else if (event.key.length === 1) {
-      // First keypress on an empty input - start tracking typing time
+      // Primeira tecla em uma entrada vazia - começar a rastrear o tempo de digitação
       if (this.inputText === '') {
-        // Find the closest matching word to start tracking
+        // Encontrar a palavra correspondente mais próxima para começar a rastrear
         const matchingWord = this.findClosestMatchingWord(event.key.toLowerCase());
         if (matchingWord && this.scoreManager && typeof this.scoreManager.startTyping === 'function') {
           this.scoreManager.startTyping(matchingWord.value);
-          // Only emit event if it's defined
+          // Emitir evento apenas se estiver definido
           if (GameEvents && GameEvents.TYPING_STARTED) {
             this.events.emit(GameEvents.TYPING_STARTED, matchingWord.value);
           }
@@ -590,12 +668,12 @@ export default class GameScene extends Phaser.Scene {
       this.inputText += event.key.toLowerCase();
     }
     
-    // Update the input display
+    // Atualizar a exibição de entrada
     if (this.inputDisplay) {
       this.inputDisplay.setText(this.inputText || '');
     }
     
-    // Check if input matches any word
+    // Verificar se a entrada corresponde a alguma palavra
     this.checkWordMatch();
   }
   
@@ -728,6 +806,7 @@ export default class GameScene extends Phaser.Scene {
             }
           });
           
+          // Restore the original score display code (adding back what was previously removed)
           // Show floating score text
           const scoreText = this.add.text(textObj.x, textObj.y - 30, `+${wordScore}`, {
             fontFamily: '"Press Start 2P", cursive',
@@ -770,11 +849,6 @@ export default class GameScene extends Phaser.Scene {
           // If ScoreManager is properly implemented, use it
           if (this.scoreManager && typeof this.scoreManager.handleWordCompleted === 'function') {
             this.scoreManager.handleWordCompleted(wordData);
-          }
-          
-          // Update score display
-          if (this.scoreText) {
-            this.scoreText.setText(`SCORE: ${this.score}`);
           }
           
           // Update score display
@@ -834,38 +908,134 @@ export default class GameScene extends Phaser.Scene {
   }
 
   levelComplete() {
-    if (this.levelCompleteText) {
-      // Set transitioning state
-      this.isLevelTransitioning = true;
+    // Definir estado de transição
+    this.isLevelTransitioning = true;
+    
+    const { width, height } = this.scale;
+    
+    // Limpar o input text para não interferir no próximo nível
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
+    }
+    
+    // Criar um retângulo transparente sobre todo o jogo
+    const overlay = this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.7);
+    
+    let message;
+    if (this.level < this.maxLevel) {
+      message = `LEVEL ${this.level} COMPLETE!`;
+    } else {
+      message = 'ALL LEVELS COMPLETE!';
+      this.campaignComplete = true;
+    }
+    
+    // Texto principal com estilo melhorado
+    const levelText = this.add.text(width/2, height/3, message, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '40px',
+      color: '#00ff00',
+      stroke: '#000',
+      strokeThickness: 5,
+      align: 'center'
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Estatísticas do nível
+    const statsText = this.add.text(width/2, height/2, 
+      `Words Cleared: ${this.wordsCleared}\nScore: ${this.score}`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '24px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 3,
+      align: 'center'
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Texto de instrução
+    const continueText = this.add.text(width/2, height * 0.7, 
+      this.level < this.maxLevel ? 'CLICK TO CONTINUE' : 'CLICK TO FINISH', {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '24px',
+      color: '#ffff00',
+      stroke: '#000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Animar a entrada dos textos
+    this.tweens.add({
+      targets: levelText,
+      alpha: 1,
+      y: height/3 - 10,
+      duration: 500,
+      ease: 'Back.easeOut'
+    });
+    
+    this.tweens.add({
+      targets: statsText,
+      alpha: 1,
+      delay: 300,
+      duration: 500
+    });
+    
+    this.tweens.add({
+      targets: continueText,
+      alpha: 1,
+      y: height * 0.7 - 5,
+      delay: 600,
+      duration: 500,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Congelar palavras existentes
+    for (const wordObj of this.words) {
+      wordObj.text.setAlpha(0.3);
+    }
+    
+    // Configurar manipulador de clique
+    this.input.once('pointerdown', () => {
+      // Desativar evento de digitação durante a transição
+      this.input.keyboard?.removeListener('keydown', this.handleKeyPress);
+      
+      // Remover elementos visuais
+      overlay.destroy();
+      levelText.destroy();
+      statsText.destroy();
+      continueText.destroy();
       
       if (this.level < this.maxLevel) {
-        this.levelCompleteText.setText(`LEVEL ${this.level} COMPLETE!\nCLICK TO CONTINUE`);
+        this.nextLevel();
       } else {
-        this.levelCompleteText.setText('CAMPAIGN COMPLETE!\nCLICK TO RESTART');
-        this.campaignComplete = true;
+        // Passar para a tela de vitória com os dados de pontuação
+        this.scene.start('WinScene', { 
+          scoreData: this.scoreManager.getScoreData() 
+        });
       }
-      
-      this.levelCompleteText.setVisible(true);
-      
-      // Freeze existing words
-      for (const wordObj of this.words) {
-        wordObj.text.setAlpha(0.5); // Make words semi-transparent to indicate frozen state
-      }
-    }
+    });
   }
 
   nextLevel() {
-    if (this.levelCompleteText) {
-      this.levelCompleteText.setVisible(false);
+    // Restaura a escuta de digitação que foi removida durante a transição
+    this.input.keyboard?.on('keydown', this.handleKeyPress, this);
+    
+    // Reseta o input text para evitar problemas
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
     }
     
     if (this.level < this.maxLevel) {
       this.level++;
       this.wordsCleared = 0;
       this.wordsToClear = this.getLevelSettings().wordsToClear;
+      
       if (this.levelText) {
         this.levelText.setText(`LEVEL: ${this.level} / ${this.maxLevel}`);
       }
+      
+      // Increase difficulty level
+      this.difficultyManager.increaseLevel();
       
       // Generate new words for the next level
       this.generateLevelWords();
@@ -884,7 +1054,10 @@ export default class GameScene extends Phaser.Scene {
       
       // Power-ups are automatically preserved since they're stored in PowerUpManager
     } else {
-      // Campaign complete, handled in levelComplete
+      // Campaign complete, go to win scene
+      this.scene.start('WinScene', { 
+        scoreData: this.scoreManager.getScoreData() 
+      });
     }
   }
   
@@ -947,111 +1120,34 @@ export default class GameScene extends Phaser.Scene {
    * Show the enhanced game over screen with detailed score information
    */
   private showGameOverScreen(): void {
-    // Ensure we only show the game over screen once
+    // Avoid showing multiple times
     if (this.isShowingGameOverScreen) return;
     
+    // Marcar que a tela de game over está sendo mostrada
     this.isShowingGameOverScreen = true;
-    console.log("Showing game over screen");
+    console.log("Exibindo tela de game over");
     
-    // Hide the standard game over text
-    if (this.gameOverText) {
-      this.gameOverText.setVisible(false);
+    // Clear input text to avoid issues when restarting
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
     }
     
-    try {
-      // Create a simple game over display
-      const { width, height } = this.scale;
-      
-      // Add semi-transparent background
-      const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.8)
-        .setOrigin(0, 0)
-        .setDepth(1000);
-      
-      // Add game over text
-      const gameOverTitle = this.add.text(width / 2, height / 3, 'GAME OVER', {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '48px',
-        color: '#ff0000',
-        stroke: '#000000',
-        strokeThickness: 6,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(1001);
-      
-      // Add score text with larger font
-      const scoreText = this.add.text(width / 2, height / 2, `FINAL SCORE: ${this.score}`, {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '36px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 4,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(1001);
-      
-      // Add words cleared text
-      const wordsText = this.add.text(width / 2, height / 2 + 60, `Words Typed: ${this.wordsCleared}`, {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '24px',
-        color: '#ffff00',
-        stroke: '#000000',
-        strokeThickness: 3,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(101);
-      
-      // Add restart instruction
-      const restartText = this.add.text(width / 2, height - 100, 'Press ENTER or CLICK to restart', {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '20px',
-        color: '#00ffff',
-        stroke: '#000000',
-        strokeThickness: 3,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(101);
-      
-      // Add blinking effect to restart text
-      this.tweens.add({
-        targets: restartText,
-        alpha: { from: 1, to: 0.3 },
-        duration: 800,
-        yoyo: true,
-        repeat: -1
-      });
-      
-      // Fade out all words
-      for (const word of this.words) {
-        if (word && word.text) {
-          this.tweens.add({
-            targets: word.text,
-            alpha: 0.2,
-            duration: 500
-          });
-        }
-      }
-      
-      // Add these elements to a container for easy management
-      const container = this.add.container(0, 0, [bg, gameOverTitle, scoreText, wordsText, restartText])
-        .setDepth(100);
-      
-      // Add scale-in animation
-      container.setScale(0.8);
-      this.tweens.add({
-        targets: container,
-        scale: 1,
-        duration: 500,
-        ease: 'Back.easeOut'
-      });
-      
-      // Make sure the container is interactive for click events
-      bg.setInteractive();
-      bg.on('pointerdown', () => {
-        this.scene.restart();
-      });
-      
-    } catch (error) {
-      console.error("Error showing game over screen:", error);
-      // Fallback to simple game over text
-      if (this.gameOverText) {
-        this.gameOverText.setVisible(true);
+    // Remover palavras da tela para limpar visualmente
+    for (const word of this.words) {
+      if (word.text) {
+        word.text.destroy();
       }
     }
+    this.words = [];
+    
+    // Get score data from score manager
+    const scoreData = this.scoreManager.getScoreData();
+    
+    // Adicionar um pequeno atraso para garantir que transição ocorra corretamente
+    this.time.delayedCall(100, () => {
+      // Transition to the GameOverScreen scene with score data
+      this.scene.start('GameOverScreen', { scoreData });
+    });
   }
 }

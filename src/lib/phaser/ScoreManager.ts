@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { BaseManager } from './BaseManager';
 import { GameEvents } from './types/GameEvents';
-import { WordData, WordType, WordEffect } from './types/WordData';
+import { WordType, WordEffect } from './types/WordData';
 import { ScoreData, WordScoreDetail, LevelScoreDetail } from './types/ScoreTypes';
 
 // Score interfaces are now imported from './types/ScoreTypes'
@@ -145,8 +145,8 @@ export class ScoreManager extends BaseManager {
     this.typingStartTime = 0;
     this.currentTypingWord = '';
 
-    // Show floating score
-    this.showFloatingScore(wordData.position.x, wordData.position.y, wordScore);
+    // Remove the call to showFloatingScore as we're handling it in GameScene
+    // this.showFloatingScore(wordData.position.x, wordData.position.y, wordScore);
   }
   
   /**
