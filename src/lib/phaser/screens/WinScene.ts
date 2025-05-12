@@ -35,9 +35,6 @@ export class WinScene extends Phaser.Scene {
     bg.fillGradientStyle(0x000066, 0x000066, 0x000033, 0x000033, 1);
     bg.fillRect(0, 0, width, height);
     
-    // Add decorative frame
-    this.add.rectangle(width/2, height/2, width - 100, height - 100, 0x000066)
-      .setStrokeStyle(8, 0x4444ff);
     
     // Create star particle system
     this.createStarParticles();
@@ -72,7 +69,7 @@ export class WinScene extends Phaser.Scene {
     });
     
     // Final score with more visual impact
-    const scoreTextBg = this.add.rectangle(width/2, height/3 + 30, 440, 60, 0x220066)
+    const scoreTextBg = this.add.rectangle(width/2, height/3 + 30, 500, 100, 0x220066)
       .setStrokeStyle(4, 0x8866ff);
       
     this.add.text(width/2, height/3 + 30, `FINAL SCORE: ${this.scoreData?.totalScore || 0}`, {
