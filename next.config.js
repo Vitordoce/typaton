@@ -3,10 +3,8 @@ const nextConfig = {
   /* config options here */
   // Add transpilePackages to ensure Phaser works correctly
   transpilePackages: ['phaser'],
-  // Add output configuration to generate the "out" directory for Vercel deployment
-  output: 'export',
-  // Specify the output directory explicitly
-  distDir: 'out'
+  // Add output configuration to generate static export
+  output: 'export'
 };
 
 module.exports = nextConfig; 
