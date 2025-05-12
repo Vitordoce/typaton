@@ -3,7 +3,6 @@ import { WordManager } from './WordManager';
 import { PowerUpManager } from './PowerUpManager';
 import { PowerUpType } from './types/PowerUpTypes';
 import { ScoreManager } from './ScoreManager';
-import { GameOverScreen } from './GameOverScreen';
 import { GameEvents } from './types/GameEvents';
 import { WordType, WordEffect } from './types/WordData';
 import { generate } from 'random-words';
@@ -56,7 +55,6 @@ export default class GameScene extends Phaser.Scene {
   private wordManager: WordManager = null!;
   private powerUpManager: PowerUpManager = null!;
   private scoreManager: ScoreManager = null!;
-  private gameOverScreen: GameOverScreen = null!;
   private arcadeFontStyle = {
     fontFamily: '"Press Start 2P", cursive',
     fontSize: '24px', // larger for falling words
@@ -123,7 +121,6 @@ export default class GameScene extends Phaser.Scene {
     this.wordManager = new WordManager(this);
     this.powerUpManager = new PowerUpManager(this);
     this.scoreManager = new ScoreManager(this);
-    this.gameOverScreen = new GameOverScreen(this);
     
     const { width, height } = this.scale;
     this.level = 1;
@@ -473,7 +470,7 @@ export default class GameScene extends Phaser.Scene {
     }
     
     // Select a random word from available words
-    wordValue = availableWords[Math.floor(Math.random() * availableWords.length)];
+    const wordValue = availableWords[Math.floor(Math.random() * availableWords.length)];
     
     // Mark the word as used
     this.usedWords.add(wordValue);
@@ -580,34 +577,44 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handleKeyPress = (event: KeyboardEvent) => {
-    if (this.gameOver || this.campaignComplete) return;
+    // Ignorar entradas durante transições de nível ou se o jogo acabou
+    if (this.gameOver || this.campaignComplete || this.isLevelTransitioning) return;
     
-    // If game over screen is showing, handle restart
-    if (this.gameOverScreen.isShowing()) {
+    // If game over is active, handle restart with Enter key
+    if (this.isShowingGameOverScreen) {
       if (event.key === 'Enter' || event.key === ' ') {
-        this.scene.restart();
+        this.scene.start('TitleScene');
         return;
       }
     }
     
-    // Handle backspace
+    // Pressionar Enter limpa a entrada atual (útil para pular palavras difíceis)
+    if (event.key === 'Enter') {
+      this.inputText = '';
+      if (this.inputDisplay) {
+        this.inputDisplay.setText('');
+      }
+      return;
+    }
+    
+    // Lidar com backspace
     if (event.key === 'Backspace') {
       this.inputText = this.inputText.slice(0, -1);
     }
-    // Ignore spacebar
+    // Ignorar espaço
     else if (event.key === ' ' || event.key === 'Space') {
-      // Do nothing - ignore spaces
+      // Não fazer nada - ignorar espaços
       return;
     }
-    // Add character to input
+    // Adicionar caractere à entrada
     else if (event.key.length === 1) {
-      // First keypress on an empty input - start tracking typing time
+      // Primeira tecla em uma entrada vazia - começar a rastrear o tempo de digitação
       if (this.inputText === '') {
-        // Find the closest matching word to start tracking
+        // Encontrar a palavra correspondente mais próxima para começar a rastrear
         const matchingWord = this.findClosestMatchingWord(event.key.toLowerCase());
         if (matchingWord && this.scoreManager && typeof this.scoreManager.startTyping === 'function') {
           this.scoreManager.startTyping(matchingWord.value);
-          // Only emit event if it's defined
+          // Emitir evento apenas se estiver definido
           if (GameEvents && GameEvents.TYPING_STARTED) {
             this.events.emit(GameEvents.TYPING_STARTED, matchingWord.value);
           }
@@ -617,12 +624,12 @@ export default class GameScene extends Phaser.Scene {
       this.inputText += event.key.toLowerCase();
     }
     
-    // Update the input display
+    // Atualizar a exibição de entrada
     if (this.inputDisplay) {
       this.inputDisplay.setText(this.inputText || '');
     }
     
-    // Check if input matches any word
+    // Verificar se a entrada corresponde a alguma palavra
     this.checkWordMatch();
   }
   
@@ -856,35 +863,128 @@ export default class GameScene extends Phaser.Scene {
   }
 
   levelComplete() {
-    if (this.levelCompleteText) {
-      // Set transitioning state
-      this.isLevelTransitioning = true;
+    // Definir estado de transição
+    this.isLevelTransitioning = true;
+    
+    const { width, height } = this.scale;
+    
+    // Limpar o input text para não interferir no próximo nível
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
+    }
+    
+    // Criar um retângulo transparente sobre todo o jogo
+    const overlay = this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.7);
+    
+    let message;
+    if (this.level < this.maxLevel) {
+      message = `LEVEL ${this.level} COMPLETE!`;
+    } else {
+      message = 'ALL LEVELS COMPLETE!';
+      this.campaignComplete = true;
+    }
+    
+    // Texto principal com estilo melhorado
+    const levelText = this.add.text(width/2, height/3, message, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '40px',
+      color: '#00ff00',
+      stroke: '#000',
+      strokeThickness: 5,
+      align: 'center'
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Estatísticas do nível
+    const statsText = this.add.text(width/2, height/2, 
+      `Words Cleared: ${this.wordsCleared}\nScore: ${this.score}`, {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '24px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 3,
+      align: 'center'
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Texto de instrução
+    const continueText = this.add.text(width/2, height * 0.7, 
+      this.level < this.maxLevel ? 'CLICK TO CONTINUE' : 'CLICK TO FINISH', {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '24px',
+      color: '#ffff00',
+      stroke: '#000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setAlpha(0);
+    
+    // Animar a entrada dos textos
+    this.tweens.add({
+      targets: levelText,
+      alpha: 1,
+      y: height/3 - 10,
+      duration: 500,
+      ease: 'Back.easeOut'
+    });
+    
+    this.tweens.add({
+      targets: statsText,
+      alpha: 1,
+      delay: 300,
+      duration: 500
+    });
+    
+    this.tweens.add({
+      targets: continueText,
+      alpha: 1,
+      y: height * 0.7 - 5,
+      delay: 600,
+      duration: 500,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Congelar palavras existentes
+    for (const wordObj of this.words) {
+      wordObj.text.setAlpha(0.3);
+    }
+    
+    // Configurar manipulador de clique
+    this.input.once('pointerdown', () => {
+      // Desativar evento de digitação durante a transição
+      this.input.keyboard?.removeListener('keydown', this.handleKeyPress);
+      
+      // Remover elementos visuais
+      overlay.destroy();
+      levelText.destroy();
+      statsText.destroy();
+      continueText.destroy();
       
       if (this.level < this.maxLevel) {
-        this.levelCompleteText.setText(`LEVEL ${this.level} COMPLETE!\nCLICK TO CONTINUE`);
+        this.nextLevel();
       } else {
-        this.levelCompleteText.setText('CAMPAIGN COMPLETE!\nCLICK TO RESTART');
-        this.campaignComplete = true;
+        // Passar para a tela de vitória com os dados de pontuação
+        this.scene.start('WinScene', { 
+          scoreData: this.scoreManager.getScoreData() 
+        });
       }
-      
-      this.levelCompleteText.setVisible(true);
-      
-      // Freeze existing words
-      for (const wordObj of this.words) {
-        wordObj.text.setAlpha(0.5); // Make words semi-transparent to indicate frozen state
-      }
-    }
+    });
   }
 
   nextLevel() {
-    if (this.levelCompleteText) {
-      this.levelCompleteText.setVisible(false);
+    // Restaura a escuta de digitação que foi removida durante a transição
+    this.input.keyboard?.on('keydown', this.handleKeyPress, this);
+    
+    // Reseta o input text para evitar problemas
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
     }
     
     if (this.level < this.maxLevel) {
       this.level++;
       this.wordsCleared = 0;
       this.wordsToClear = this.getLevelSettings().wordsToClear;
+      
       if (this.levelText) {
         this.levelText.setText(`LEVEL: ${this.level} / ${this.maxLevel}`);
       }
@@ -906,6 +1006,13 @@ export default class GameScene extends Phaser.Scene {
       
       // Increase WordManager difficulty
       this.wordManager.increaseLevel();
+      
+      // Power-ups are automatically preserved since they're stored in PowerUpManager
+    } else {
+      // Campaign complete, go to win scene
+      this.scene.start('WinScene', { 
+        scoreData: this.scoreManager.getScoreData() 
+      });
     }
   }
   
@@ -968,111 +1075,20 @@ export default class GameScene extends Phaser.Scene {
    * Show the enhanced game over screen with detailed score information
    */
   private showGameOverScreen(): void {
-    // Ensure we only show the game over screen once
+    // Avoid showing multiple times
     if (this.isShowingGameOverScreen) return;
-    
     this.isShowingGameOverScreen = true;
-    console.log("Showing game over screen");
     
-    // Hide the standard game over text
-    if (this.gameOverText) {
-      this.gameOverText.setVisible(false);
+    // Clear input text to avoid issues when restarting
+    this.inputText = '';
+    if (this.inputDisplay) {
+      this.inputDisplay.setText('');
     }
     
-    try {
-      // Create a simple game over display
-      const { width, height } = this.scale;
-      
-      // Add semi-transparent background
-      const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.8)
-        .setOrigin(0, 0)
-        .setDepth(1000);
-      
-      // Add game over text
-      const gameOverTitle = this.add.text(width / 2, height / 3, 'GAME OVER', {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '48px',
-        color: '#ff0000',
-        stroke: '#000000',
-        strokeThickness: 6,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(1001);
-      
-      // Add score text with larger font
-      const scoreText = this.add.text(width / 2, height / 2, `FINAL SCORE: ${this.score}`, {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '36px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 4,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(1001);
-      
-      // Add words cleared text
-      const wordsText = this.add.text(width / 2, height / 2 + 60, `Words Typed: ${this.wordsCleared}`, {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '24px',
-        color: '#ffff00',
-        stroke: '#000000',
-        strokeThickness: 3,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(101);
-      
-      // Add restart instruction
-      const restartText = this.add.text(width / 2, height - 100, 'Press ENTER or CLICK to restart', {
-        fontFamily: '"Press Start 2P", cursive',
-        fontSize: '20px',
-        color: '#00ffff',
-        stroke: '#000000',
-        strokeThickness: 3,
-        align: 'center'
-      }).setOrigin(0.5).setDepth(101);
-      
-      // Add blinking effect to restart text
-      this.tweens.add({
-        targets: restartText,
-        alpha: { from: 1, to: 0.3 },
-        duration: 800,
-        yoyo: true,
-        repeat: -1
-      });
-      
-      // Fade out all words
-      for (const word of this.words) {
-        if (word && word.text) {
-          this.tweens.add({
-            targets: word.text,
-            alpha: 0.2,
-            duration: 500
-          });
-        }
-      }
-      
-      // Add these elements to a container for easy management
-      const container = this.add.container(0, 0, [bg, gameOverTitle, scoreText, wordsText, restartText])
-        .setDepth(100);
-      
-      // Add scale-in animation
-      container.setScale(0.8);
-      this.tweens.add({
-        targets: container,
-        scale: 1,
-        duration: 500,
-        ease: 'Back.easeOut'
-      });
-      
-      // Make sure the container is interactive for click events
-      bg.setInteractive();
-      bg.on('pointerdown', () => {
-        this.scene.restart();
-      });
-      
-    } catch (error) {
-      console.error("Error showing game over screen:", error);
-      // Fallback to simple game over text
-      if (this.gameOverText) {
-        this.gameOverText.setVisible(true);
-      }
-    }
+    // Get score data from score manager
+    const scoreData = this.scoreManager.getScoreData();
+    
+    // Transition to the GameOverScreen scene with score data
+    this.scene.start('GameOverScreen', { scoreData });
   }
 }
