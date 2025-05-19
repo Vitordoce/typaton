@@ -145,7 +145,7 @@ export class GameOverScreen extends Phaser.Scene {
       ease: 'Sine.easeInOut'
     });
     
-    // Add keyboard handling para ENTER e ESPAÇO
+    // Add keyboard handling para ESPAÇO
     this.input.keyboard?.on('keydown-SPACE', () => {
       this.restartGame();
     });

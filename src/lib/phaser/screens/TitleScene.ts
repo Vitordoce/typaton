@@ -103,6 +103,7 @@ export class TitleScene extends Phaser.Scene {
   
   // Method to start the game
   private startGame() {
+    
     // Add a brief flash effect before starting
     this.cameras.main.flash(500, 255, 255, 255, true, (camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
       if (progress === 1) {
@@ -116,7 +117,7 @@ export class TitleScene extends Phaser.Scene {
    */
   private createFallingWords() {
     const { width, height } = this.scale;
-    const words = ['type', 'fast', 'game', 'score', 'win', 'power', 'freeze', 'shield', 'bomb'];
+    const words = ['type', 'fast', 'game', 'score', 'win', 'power', 'freeze', 'shield', 'bomb','letter'];
     
     words.forEach((word, index) => {
       const x = Phaser.Math.Between(100, width - 100);

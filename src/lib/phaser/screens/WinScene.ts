@@ -194,7 +194,7 @@ export class WinScene extends Phaser.Scene {
 
     // Listener para Space reiniciar
     this.input.keyboard?.on('keydown-SPACE', () => {
-      // Limpar partículas antes de trocar de cena
+      
       this.emitters.forEach(emitter => emitter.stop());
       this.scene.start('TitleScene');
     });
@@ -317,6 +317,6 @@ export class WinScene extends Phaser.Scene {
   }
   
   update() {
-    // Any continuous updates can be added here
+
   }
 } 

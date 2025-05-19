@@ -80,8 +80,8 @@ export default class GameScene extends Phaser.Scene {
       minDuration: 5,
       maxDuration: 10,
       wordsToClear: 10 + (this.level - 1) * 3,
-      minWordLength: 3, // Fixed minimum length of 3
-      maxWordLength: Math.min(4 + Math.floor(this.level / 2), 8)  // Start with max length of 4, increase with level
+      minWordLength: Math.floor(Math.random() * 3) + 3, // Random minimum length between 3 and 5
+      maxWordLength: Math.min(5 + Math.floor(this.level / 2), 8)  // Start with max length of 4, increase with level
     };
   }
 
@@ -189,10 +189,27 @@ export default class GameScene extends Phaser.Scene {
       lineSpacing: 20
     }).setOrigin(0.5).setVisible(false);
 
-    // Remover todos os listeners de teclado antigos para evitar duplicidade e efeitos colaterais
+    // Reset completo do estado do jogo
     if (this.input.keyboard) {
       this.input.keyboard.removeAllListeners();
     }
+    
+    this.words = [];
+    this.levelWords = [];
+    this.usedWords.clear();
+    this.lastSpawnTime = 0;
+    this.wordsCleared = 0;
+    this.wordsToClear = this.getLevelSettings().wordsToClear;
+    this.inputText = '';
+    this.isShowingGameOverScreen = false;
+    this.gameOver = false;
+    this.campaignComplete = false;
+    this.isLevelTransitioning = false;
+    this.level = 1;
+    if (this.wordManager) this.wordManager.resetLevel();
+    if (this.scoreManager) this.scoreManager.resetScores();
+    if (this.powerUpManager) this.powerUpManager.setupPowerUpIndicators();
+    this.generateLevelWords();
 
     // Set up keyboard input
     this.input.keyboard?.on('keydown', this.handleKeyPress, this);
@@ -405,25 +422,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // EXTENSIBILITY POINT: Add more condition checks here
-    // Example:
-    // if (wordObj.spinning) {
-    //   this.applySpinningEffect(wordObj, delta);
-    // }
   }
+  //Apply blinking effect to a word
 
-  /**
-   * Apply blinking effect to a word
-   * 
-   * @param wordObj - The word to apply the effect to
-   * @param delta - Time since last frame in milliseconds
-   * 
-   * Effect: Word toggles visibility on/off at regular intervals
-   * 
-   * Implementation:
-   * - Uses a timer (blinkTimer) to track when to toggle visibility
-   * - Resets timer when it reaches the blink interval (250ms)
-   * - Word is completely invisible during "off" phases
-   */
   private applyBlinkingEffect(wordObj: WordObject, delta: number) {
     wordObj.blinkTimer = (wordObj.blinkTimer || 0) + delta;
     if (wordObj.blinkTimer > 250) { // toggle every 250ms
@@ -432,13 +433,7 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Apply shaking effect to a word
-   * 
-   * @param wordObj - The word to apply the effect to
-   * 
-   * Effect: Word vibrates/shakes with random offsets each frame
-  **/
+  //Apply shaking effect to a word
   private applyShakingEffect(wordObj: WordObject) {
     // Randomize shake offsets each frame
     const shakeX = Phaser.Math.Between(-12, 12);
@@ -622,7 +617,6 @@ export default class GameScene extends Phaser.Scene {
       wordObj.text.setTint(0xffe600);
     }
 
-    // EXTENSIBILITY POINT: Add more bad conditions here
   }
 
   handleKeyPress = (event: KeyboardEvent) => {
@@ -859,7 +853,6 @@ export default class GameScene extends Phaser.Scene {
     
     const { width, height } = this.scale;
     
-    // Limpar o input text para não interferir no próximo nível
     this.inputText = '';
     if (this.inputDisplay) {
       this.inputDisplay.setText('');
@@ -1001,6 +994,8 @@ export default class GameScene extends Phaser.Scene {
       // Power-ups are automatically preserved since they're stored in PowerUpManager
     } else {
       // Campaign complete, go to win scene
+      this.isLevelTransitioning = false;
+
       this.scene.start('WinScene', { 
         scoreData: this.scoreManager.getScoreData() 
       });
