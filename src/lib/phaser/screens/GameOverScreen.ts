@@ -146,16 +146,12 @@ export class GameOverScreen extends Phaser.Scene {
     });
     
     // Add keyboard handling para ENTER e ESPAÇO
-    this.input.keyboard?.on('keydown-ENTER', () => {
-      this.restartGame();
-    });
-    
     this.input.keyboard?.on('keydown-SPACE', () => {
       this.restartGame();
     });
     
     // Add instruction text com mais destaque
-    const instructionText = this.add.text(width/2, height * 0.85, 'PRESS ENTER OR SPACE TO RESTART', {
+    const instructionText = this.add.text(width/2, height * 0.85, 'PRESS SPACE TO RESTART', {
       fontFamily: '"Press Start 2P", cursive',
       fontSize: '16px',
       color: '#ffffff',

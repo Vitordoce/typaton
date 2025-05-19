@@ -175,6 +175,29 @@ export class WinScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut'
     });
+
+    // Instrução para reiniciar
+    const instructionText = this.add.text(width/2, height * 0.92, 'PRESS SPACE TO RESTART', {
+      fontFamily: '"Press Start 2P", cursive',
+      fontSize: '20px',
+      color: '#ffffff',
+      stroke: '#000',
+      strokeThickness: 2
+    }).setOrigin(0.5);
+    this.tweens.add({
+      targets: instructionText,
+      alpha: { from: 1, to: 0.4 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1
+    });
+
+    // Listener para Space reiniciar
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      // Limpar partículas antes de trocar de cena
+      this.emitters.forEach(emitter => emitter.stop());
+      this.scene.start('TitleScene');
+    });
   }
   
   /**

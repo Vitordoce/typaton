@@ -189,6 +189,11 @@ export default class GameScene extends Phaser.Scene {
       lineSpacing: 20
     }).setOrigin(0.5).setVisible(false);
 
+    // Remover todos os listeners de teclado antigos para evitar duplicidade e efeitos colaterais
+    if (this.input.keyboard) {
+      this.input.keyboard.removeAllListeners();
+    }
+
     // Set up keyboard input
     this.input.keyboard?.on('keydown', this.handleKeyPress, this);
 
@@ -621,18 +626,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handleKeyPress = (event: KeyboardEvent) => {
-    // Ignorar entradas durante transições de nível ou se o jogo acabou
-    if (this.gameOver || this.campaignComplete || this.isLevelTransitioning) return;
-    
-    // If game over is active, handle restart with Enter key
-    if (this.isShowingGameOverScreen) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        this.scene.start('TitleScene');
-        return;
-      }
-    }
-    
-    // Pressionar Enter limpa a entrada atual (útil para pular palavras difíceis)
+    // Enter sempre limpa o input, independentemente do estado
     if (event.key === 'Enter') {
       this.inputText = '';
       if (this.inputDisplay) {
@@ -640,15 +634,18 @@ export default class GameScene extends Phaser.Scene {
       }
       return;
     }
-    
+
+    // Espaço é sempre ignorado durante o jogo
+    if (event.key === ' ' || event.key === 'Space') {
+      return;
+    }
+
+    // Se o jogo está em transição, game over ou campanha completa, não processa outros inputs
+    if (this.gameOver || this.campaignComplete || this.isLevelTransitioning || this.isShowingGameOverScreen) return;
+
     // Lidar com backspace
     if (event.key === 'Backspace') {
       this.inputText = this.inputText.slice(0, -1);
-    }
-    // Ignorar espaço
-    else if (event.key === ' ' || event.key === 'Space') {
-      // Não fazer nada - ignorar espaços
-      return;
     }
     // Adicionar caractere à entrada
     else if (event.key.length === 1) {
@@ -664,15 +661,14 @@ export default class GameScene extends Phaser.Scene {
           }
         }
       }
-      
       this.inputText += event.key.toLowerCase();
     }
-    
+
     // Atualizar a exibição de entrada
     if (this.inputDisplay) {
       this.inputDisplay.setText(this.inputText || '');
     }
-    
+
     // Verificar se a entrada corresponde a alguma palavra
     this.checkWordMatch();
   }
@@ -770,30 +766,7 @@ export default class GameScene extends Phaser.Scene {
           // Store the text object reference before removing from array
           const textObj = this.words[i].text;
           
-          // Calculate enhanced score based on word length
-          const wordLength = wordValue.length;
-          const baseScore = wordLength * 10; // 10 points per letter
-          
-          // Add bonuses for longer words
-          let bonusMultiplier = 1.0;
-          
-          // Length bonus: 50% bonus per letter above 5
-          if (wordLength > 5) {
-            bonusMultiplier += (wordLength - 5) * 0.5;
-          }
-          
-          // Effect bonus: each effect adds a bonus
-          if (this.words[i].blinking) bonusMultiplier += 0.2;
-          if (this.words[i].shaking) bonusMultiplier += 0.3;
-          if (this.words[i].flipped) bonusMultiplier += 0.4;
-          
-          // Calculate final score with bonuses
-          const wordScore = Math.round(baseScore * bonusMultiplier);
-          
-          // Update score
-          this.score += wordScore;
-          
-          // Add completion effect with score
+          // Add completion effect
           this.tweens.add({
             targets: textObj,
             alpha: 0,
@@ -803,29 +776,6 @@ export default class GameScene extends Phaser.Scene {
             onComplete: () => {
               // Remove the word after the effect
               textObj.destroy();
-            }
-          });
-          
-          // Restore the original score display code (adding back what was previously removed)
-          // Show floating score text
-          const scoreText = this.add.text(textObj.x, textObj.y - 30, `+${wordScore}`, {
-            fontFamily: '"Press Start 2P", cursive',
-            fontSize: '20px',
-            color: '#ffff00',
-            stroke: '#000000',
-            strokeThickness: 4
-          }).setOrigin(0.5).setDepth(50);
-          
-          // Animate the score text
-          this.tweens.add({
-            targets: scoreText,
-            y: scoreText.y - 50,
-            alpha: { from: 1, to: 0 },
-            scale: { from: 1, to: 1.5 },
-            duration: 1000,
-            ease: 'Power2',
-            onComplete: () => {
-              scoreText.destroy();
             }
           });
           
@@ -846,16 +796,12 @@ export default class GameScene extends Phaser.Scene {
           // Track cleared words
           this.wordsCleared++;
           
-          // If ScoreManager is properly implemented, use it
+          // Usar ScoreManager para processar a palavra completada
           if (this.scoreManager && typeof this.scoreManager.handleWordCompleted === 'function') {
             this.scoreManager.handleWordCompleted(wordData);
           }
           
-          // Update score display
-          if (this.scoreText) {
-            this.scoreText.setText(`SCORE: ${this.score}`);
-          }
-          
+          // Se atingiu o número de palavras para o nível, avança
           if (this.wordsCleared >= this.getLevelSettings().wordsToClear) {
             this.levelComplete();
           }
@@ -1084,36 +1030,6 @@ export default class GameScene extends Phaser.Scene {
     if (this.powerUpManager) {
       this.powerUpManager.bringToFront();
     }
-  }
-  
-  /**
-   * Show floating score text at the given position
-   * @param x - X position
-   * @param y - Y position
-   * @param score - Score to display
-   */
-  private showFloatingScore(x: number, y: number, score: number): void {
-    // Create floating score text
-    const scoreText = this.add.text(x, y, `+${score}`, {
-      fontFamily: '"Press Start 2P", cursive',
-      fontSize: '20px',
-      color: '#ffff00',
-      stroke: '#000000',
-      strokeThickness: 4
-    }).setOrigin(0.5).setDepth(50);
-    
-    // Add floating animation
-    this.tweens.add({
-      targets: scoreText,
-      y: y - 80,
-      alpha: { from: 1, to: 0 },
-      scale: { from: 1, to: 1.5 },
-      duration: 1000,
-      ease: 'Power2',
-      onComplete: () => {
-        scoreText.destroy();
-      }
-    });
   }
   
   /**

@@ -75,7 +75,7 @@ export class TitleScene extends Phaser.Scene {
     });
 
     // Add "Press ENTER to start" text
-    const enterText = this.add.text(width/2, height * 0.85, 'PRESS ENTER TO START', {
+    const spaceText = this.add.text(width/2, height * 0.85, 'PRESS SPACE TO START', {
       fontFamily: '"Press Start 2P", cursive',
       fontSize: '22px',
       color: '#ffffff',
@@ -85,15 +85,15 @@ export class TitleScene extends Phaser.Scene {
     
     // Add blinking animation to the ENTER text
     this.tweens.add({
-      targets: enterText,
+      targets: spaceText,
       alpha: { from: 1, to: 0.3 },
       duration: 800,
       yoyo: true,
       repeat: -1
     });
     
-    // Set up keyboard input for Enter key
-    this.input.keyboard?.on('keydown-ENTER', () => {
+    // Set up keyboard input for Space key
+    this.input.keyboard?.on('keydown-SPACE', () => {
       this.startGame();
     });
 
