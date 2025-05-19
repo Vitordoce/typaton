@@ -132,6 +132,8 @@ export default class GameScene extends Phaser.Scene {
     this.inputText = '';
     this.lastSpawnTime = 0;
     this.score = 0;
+    this.isLevelTransitioning = false;
+    this.isShowingGameOverScreen = false;
 
     // Reset managers
     this.wordManager.resetLevel();
@@ -194,21 +196,6 @@ export default class GameScene extends Phaser.Scene {
       this.input.keyboard.removeAllListeners();
     }
     
-    this.words = [];
-    this.levelWords = [];
-    this.usedWords.clear();
-    this.lastSpawnTime = 0;
-    this.wordsCleared = 0;
-    this.wordsToClear = this.getLevelSettings().wordsToClear;
-    this.inputText = '';
-    this.isShowingGameOverScreen = false;
-    this.gameOver = false;
-    this.campaignComplete = false;
-    this.isLevelTransitioning = false;
-    this.level = 1;
-    if (this.wordManager) this.wordManager.resetLevel();
-    if (this.scoreManager) this.scoreManager.resetScores();
-    if (this.powerUpManager) this.powerUpManager.setupPowerUpIndicators();
     this.generateLevelWords();
 
     // Set up keyboard input
@@ -277,6 +264,36 @@ export default class GameScene extends Phaser.Scene {
 
     // Initialize difficulty manager
     this.difficultyManager = new DifficultyManager();
+
+    // Add event listener for score updates
+    this.events.on(GameEvents.SCORE_UPDATED, (data: { totalScore: number; wordScore: number; wordData: { position: Phaser.Math.Vector2 } }) => {
+      // Update the score display
+      if (this.scoreText) {
+        this.scoreText.setText(`SCORE: ${data.totalScore}`);
+      }
+      // Show floating score text
+      if (data.wordData && data.wordData.position) {
+        const scoreText = this.add.text(data.wordData.position.x, data.wordData.position.y, `+${data.wordScore}`, {
+          fontFamily: '"Press Start 2P", cursive',
+          fontSize: '20px',
+          color: '#ffff00',
+          stroke: '#000000',
+          strokeThickness: 4
+        }).setOrigin(0.5).setDepth(50);
+
+        this.tweens.add({
+          targets: scoreText,
+          y: data.wordData.position.y - 50,
+          alpha: { from: 1, to: 0 },
+          scale: { from: 1, to: 1.5 },
+          duration: 1000,
+          ease: 'Power2',
+          onComplete: () => {
+            scoreText.destroy();
+          }
+        });
+      }
+    });
   }
 
   /**

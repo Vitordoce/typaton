@@ -5,7 +5,7 @@ export class DifficultyManager {
   private readonly maxLevel: number = 5;
   private readonly baseSettings: DifficultySettings = {
     baseWordScore: 6,
-    maxSpeed: 2,
+    maxSpeed: 3,
     maxLength: 4,
     maxModifierScore: 2
   };
